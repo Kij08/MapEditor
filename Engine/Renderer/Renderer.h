@@ -10,7 +10,7 @@
 #include <optional>
 #include <fstream>
 #include <array>
-#include "Primitives/Mesh.h"
+#include "../Primitives/Mesh.h"
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 #include <memory>

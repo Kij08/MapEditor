@@ -5,7 +5,7 @@
 #ifndef ASSETLOADER_H
 #define ASSETLOADER_H
 
-
+#include "../Renderer/Renderer.h"
 
 class AssetLoader {
 

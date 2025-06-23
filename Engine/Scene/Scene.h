@@ -6,7 +6,7 @@
 #define SCENE_H
 
 #include <vector>
-#include "../../Primitives/Object.h"
+#include "../Primitives/Object.h"
 #include <unordered_map>
 
 struct ObjectMaterialGrouping {

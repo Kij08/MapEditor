@@ -15,11 +15,14 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "include/stb_image.h"
+#include "../../include/stb_image.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include "include/tiny_obj_loader.h"
-#include "Primitives/Object.h"
+#include "../../include/tiny_obj_loader.h"
+#include "../Primitives/Object.h"
+
+#define VMA_IMPLEMENTATION
+#include "../../include/vk_mem_alloc.h"
 
 //Static functions
 static std::vector<char> ReadShaderFiles(const std::string& filename)
