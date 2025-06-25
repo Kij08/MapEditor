@@ -488,10 +488,15 @@ void Renderer::CreateLogicalDevice()
 		queueCreateInfos.push_back(queueCreateInfo);
 	}
 
+	constexpr VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+		.dynamicRendering = VK_TRUE,
+	};
+
 	VkPhysicalDeviceFeatures deviceFeatures{};
 	deviceFeatures.samplerAnisotropy = VK_TRUE;
 
-	VkDeviceCreateInfo createInfo{};
+	VkDeviceCreateInfo createInfo{ .pNext = &dynamic_rendering_feature };
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();;
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
@@ -822,8 +827,16 @@ void Renderer::CreateGraphicsPipeline()
 	depthStencil.front = {}; // Optional
 	depthStencil.back = {}; // Optional
 
+	const VkPipelineRenderingCreateInfoKHR PipelineRenderingCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+		.colorAttachmentCount = 1,
+		.pColorAttachmentFormats = &swapChainImageFormat,
+		.depthAttachmentFormat = FindDepthFormat()
+	};
+
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.pNext = &PipelineRenderingCreateInfo,
 	pipelineInfo.stageCount = 2;
 	pipelineInfo.pStages = shaderStages;
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -835,7 +848,7 @@ void Renderer::CreateGraphicsPipeline()
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = &dynamicState;
 	pipelineInfo.layout = PipelineLayout;
-	pipelineInfo.renderPass = RenderPass;
+	pipelineInfo.renderPass = VK_NULL_HANDLE;
 	pipelineInfo.subpass = 0;
 
 	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &GraphicsPipeline) != VK_SUCCESS) {
@@ -1146,22 +1159,101 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		throw std::runtime_error("Could not begin recording command buffer!");
 	}
 
-	VkRenderPassBeginInfo renderPassInfo{};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassInfo.renderPass = RenderPass;
-	renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
-	renderPassInfo.renderArea.offset = { 0, 0 };
-	renderPassInfo.renderArea.extent = swapChainExtent;
+	//Image transitions from undefined to attach for optimal attachment before rendering
+	const VkImageMemoryBarrier ImgMemBarrierColourAttach {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		.image = swapChainImages[imageIndex],
+		.subresourceRange = {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel = 0,
+			.levelCount = 1,
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		  }
+	};
 
+	vkCmdPipelineBarrier(
+		CmdBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  // srcStageMask
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // dstStageMask
+		0,
+		0,
+		nullptr,
+		0,
+		nullptr,
+		1, // imageMemoryBarrierCount
+		&ImgMemBarrierColourAttach // pImageMemoryBarriers
+	);
+
+	const VkImageMemoryBarrier ImgMemBarrierDepthAttach {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+		.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+		.image = DepthImage,
+		.subresourceRange = {
+			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+			.baseMipLevel = 0,
+			.levelCount = 1,
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		  }
+	};
+
+	vkCmdPipelineBarrier(
+	CmdBuffer,
+	VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,  // srcStageMask
+	VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, // dstStageMask
+	0,
+	0,
+	nullptr,
+	0,
+	nullptr,
+	1, // imageMemoryBarrierCount
+	&ImgMemBarrierDepthAttach // pImageMemoryBarriers
+	);
+
+
+	//Info for dynamic rendering
 	std::array<VkClearValue, 2> clearValues{};
 	clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
 	clearValues[1].depthStencil = { 1.0f, 0 };
-	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-	renderPassInfo.pClearValues = clearValues.data();
 
-	vkCmdBeginRenderPass(CmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	//vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
+	const VkRenderingAttachmentInfoKHR ColourAttachInfo {
+		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+		.imageView = swapChainImageViews[imageIndex],
+		.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.clearValue = clearValues[0]
+	};
 
+	const VkRenderingAttachmentInfoKHR DepthAttachInfo {
+		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+		.imageView = DepthImageView,
+		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+		.resolveMode = VK_RESOLVE_MODE_NONE,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.clearValue = clearValues[1]
+	};
+
+	VkRect2D renderingArea = {VkOffset2D{}, VkExtent2D{WIDTH, HEIGHT}};
+
+	const VkRenderingInfoKHR RenderInfo {
+		.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
+		.renderArea = renderingArea,
+		.layerCount = 1,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = &ColourAttachInfo,
+		.pDepthAttachment = &DepthAttachInfo
+	};
+
+	///Start Draw
+	vkCmdBeginRenderingKHR(CmdBuffer, &RenderInfo);
 
 	//Since these are dynamic they must be set here
 	VkViewport viewport{};
@@ -1273,7 +1365,38 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		vkCmdDrawIndexed(CmdBuffer, static_cast<uint32_t>(obj->GetIndexSizeInBuffer()), 1, obj->GetIndexOffset(), 0, 0);
 	}*/
 
-	vkCmdEndRenderPass(CmdBuffer);
+	vkCmdEndRendering(CmdBuffer);
+
+	//Transition colour swapchain images to present bit for optimal rendering
+	const VkImageMemoryBarrier ImgMemBarrierPresentTransition {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+		.image = swapChainImages[imageIndex],
+		.subresourceRange = {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel = 0,
+			.levelCount = 1,
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		  }
+	};
+
+	vkCmdPipelineBarrier(
+		CmdBuffer,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  // srcStageMask
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // dstStageMask
+		0,
+		0,
+		nullptr,
+		0,
+		nullptr,
+		1, // imageMemoryBarrierCount
+		&ImgMemBarrierPresentTransition // pImageMemoryBarriers
+	);
+
+
 
 	if (vkEndCommandBuffer(CmdBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("Could not record command buffer!");
