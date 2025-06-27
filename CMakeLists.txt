@@ -8,7 +8,7 @@ include_directories(/include /include/imgui)
 add_executable(MapEditor main.cpp
         Engine/Renderer/Renderer.cpp Engine/Renderer/Renderer.h
         Engine/Primitives/Mesh.cpp Engine/Primitives/Mesh.h
-        include/stb_image.h include/tiny_obj_loader.h
+        include/stb_image.h include/tiny_obj_loader.h include/vk_mem_alloc.h
         Engine/Primitives/Object.cpp Engine/Primitives/Object.h
         Engine/Scene/Scene.cpp
         Engine/Scene/Scene.h
@@ -20,6 +20,5 @@ add_executable(MapEditor main.cpp
         Engine/Primitives/Material.h
         Engine/Utils/AssetLoader.cpp
         Engine/Utils/AssetLoader.h
-        include/vk_mem_alloc.h
         Engine/Renderer/RDescriptors.cpp
         Engine/Renderer/RDescriptors.h)

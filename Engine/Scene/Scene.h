@@ -6,8 +6,7 @@
 #define SCENE_H
 
 #include <vector>
-#include "../Primitives/Object.h"
-#include <unordered_map>
+#include "../Utils/AssetLoader.h"
 
 struct ObjectMaterialGrouping {
 
@@ -19,18 +18,15 @@ protected:
     //List of all objects, grouped by material
     std::vector<ObjectMaterialGrouping> materialGroupings;
 
-    //Assets loaded for this scene
-    std::unordered_map<std::string, std::shared_ptr<Mesh>> LoadedMeshes;
-    std::unordered_map<std::string, std::shared_ptr<Texture>> LoadedTextures;
-
+    AssetManager sceneAssetManager;
 private:
 
 public:
 
     void InitScene();
-    void AddObject(Object* obj);
+
+    template<class TObject>
+    TObject* CreateObject();
 };
-
-
 
 #endif //SCENE_H

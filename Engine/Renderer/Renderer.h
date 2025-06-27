@@ -14,13 +14,23 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 #include <memory>
-class Object;
+
+#define VMA_IMPLEMENTATION
+#include "../../include/vk_mem_alloc.h"
+
+#include "../Primitives/Object.h"
+
 class Window;
 //The base of the Renderer class was created with help of the Vulkan Tutorial: https://vulkan-tutorial.com/Introduction
 
 class Renderer {
 
+
 public:
+
+	static Renderer& Get();
+
+
 	const uint32_t WIDTH = 1280;
 	const uint32_t HEIGHT = 720;
 
@@ -35,47 +45,11 @@ public:
 
 	void SetFrameBufferResized(bool resized) { framebufferResized = resized; };
 
-	struct Vertex { //This struct holds mesh vertex data and decribes the bindings for vertex shader data
-		Mesh::MeshData mesh;
 
-		static VkVertexInputBindingDescription getBindingDescription() {
-			VkVertexInputBindingDescription bindingDescription{};
-			bindingDescription.binding = 0;
-			bindingDescription.stride = sizeof(Vertex);
-			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-			return bindingDescription;
-		}
-
-		static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions() {
-			std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
-
-			attributeDescriptions[0].binding = 0;
-			attributeDescriptions[0].location = 0;
-			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[0].offset = offsetof(Vertex, mesh.pos);
-
-			attributeDescriptions[1].binding = 0;
-			attributeDescriptions[1].location = 1;
-			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[1].offset = offsetof(Vertex, mesh.colour);
-
-			attributeDescriptions[2].binding = 0;
-			attributeDescriptions[2].location = 2;
-			attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-			attributeDescriptions[2].offset = offsetof(Vertex, mesh.uv);
-
-			attributeDescriptions[3].binding = 0;
-			attributeDescriptions[3].location = 3;
-			attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[3].offset = offsetof(Vertex, mesh.normal);
-
-			return attributeDescriptions;
-		}
-
-		bool operator==(const Vertex& other) const {
-			return mesh.pos == other.mesh.pos && mesh.colour == other.mesh.colour && mesh.uv == other.mesh.uv && mesh.normal == other.mesh.normal;
-		}
+	struct VmaBuffer {
+		VkBuffer buffer;
+		VmaAllocation allocation;
+		VmaAllocationInfo info;
 	};
 
 	//Loading Models
@@ -141,6 +115,10 @@ private:
 	VkDevice device;
 	void CreateLogicalDevice();
 	VkQueue graphicsQueue;
+
+	//VMA allocator
+	VmaAllocator vmaAllocator;
+	void CreateVulkanAllocator();
 
 	//Vulkan-GLFW window surface
 	VkSurfaceKHR surface;
@@ -221,6 +199,13 @@ private:
 	VkDeviceMemory VertexBufferMemory;
 	VkBuffer IndexBuffer;
 	VkDeviceMemory IndexBufferMemory;
+
+	//Buffer for objs loaded and objs spawned during play
+	VmaBuffer LoadedObjVertexBuffer;
+	VmaBuffer LoadedObjIndexBuffer;
+	VmaBuffer TransientObjVertexBuffer;
+	VmaBuffer TransientObjIndexBuffer;
+
 	std::vector<VkBuffer> UniformBuffers; //Objects share the same UBOs since it just has proj and view info in it.
 	std::vector<VkDeviceMemory> UniformBuffersMemory;
 	std::vector<void*> UniformBuffersMapped;
@@ -229,7 +214,13 @@ private:
 	int currentVertexBufferOffset = 0;
 	int currentIndexBufferOffset = 0;
 
-	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+public:
+	//For staging buffer: Use VK_BUFFER_USAGE_TRANSFER_SRC_BIT usage. VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT flag.
+	//For readback from compute: same usage. VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT flag
+	//For uniform buffer VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT flag
+	VmaBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flags);
+
+	void DestroyBuffer(const VmaBuffer& buffer);
 	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
@@ -239,6 +230,7 @@ private:
 	void UpdateIndexBuffer(int newObjIndexOffset, int newObjIndexSize);
 	void CreateUniformBuffer();
 
+private:
 	//Descriptor Set
 	VkDescriptorSetLayout DescriptorSetLayout;
 	VkDescriptorPool DescriptorPool;
@@ -247,8 +239,10 @@ private:
 	void CreateDescriptorSetLayout();
 	void CreateDescriptorPool();
 	void CreateDescriptorSets();
-	void UpdateDescriptorSets(int objTextureIndex);
 
+public:
+	void UpdateDescriptorSets(int objTextureIndex);
+private:
 	//UBO
 	struct UniformBufferObject {
 		alignas(16) glm::mat4 view;
@@ -257,6 +251,7 @@ private:
 
 	struct MeshPushConstant {
 		glm::mat4 modelMatrix;
+
 		float Ka;
 		float Kd;
 		float Ks;
@@ -270,16 +265,17 @@ private:
 	std::vector<VkImageView> TextureImageViews;
 	VkSampler TextureSampler;
 
+public:
 	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 
-	void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+	Texture CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage);
 	void CreateTextureImageView(int objTexIndex);
 
 	void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
 	void CreateTextureSampler();
-
+private:
 	struct TextureCacheData {
 		std::string path;
 		int indexInTexArray;
@@ -288,9 +284,11 @@ private:
 	std::vector<TextureCacheData> TextureCache;
 
 	//Depth buffer
-	VkImage DepthImage;
+	/*VkImage DepthImage;
 	VkDeviceMemory DepthImageMemory;
-	VkImageView DepthImageView;
+	VkImageView DepthImageView;*/
+
+	Texture DepthTexture;
 
 	void CreateDepthResources();
 
