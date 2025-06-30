@@ -37,16 +37,20 @@ struct DescriptorAllocator {
 };
 
 struct DescriptorAllocatorGrowable {
-public:
+
+    //Type and ratio. Ratio determines how many descriptors in each descriptor set.
     struct PoolSizeRatio {
         VkDescriptorType type;
         float ratio;
     };
 
+    //Max sets is how many descriptor sets can be allocated from this pool.
     void InitPool(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios);
+    //Will reset all descriptors in the poll
     void ClearDescriptors(VkDevice device);
     void DestroyPools(VkDevice device);
 
+    //Allocates set from pool
     VkDescriptorSet AllocateDescriptorSet(VkDevice device, VkDescriptorSetLayout layout, void* pNext = nullptr);
 private:
     VkDescriptorPool GetPool(VkDevice device);

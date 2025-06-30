@@ -51,12 +51,8 @@ std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath)
 
 }
 
-//Loads model and returns the offset of the vertex and indeces
 std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 {
-	//Calculate the offset for the model we are loading. If the vertex buffer is empty this is the first loaded model and the offset is 0.
-	//If its not empty the offset starts at array.size()
-
 	//Check if mesh is already loaded
 	auto loadedMesh = LoadedMeshes.find(modelPath);
 	if (loadedMesh != LoadedMeshes.end()) {

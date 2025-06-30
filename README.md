@@ -23,3 +23,8 @@ has turned into more of a custom game engine.
 - ImGUI
 
 Developed and tested on Linux.
+
+Shoutout to these sites for providing tutorials, explanations, and code:
+- https://vulkan-tutorial.com/
+- https://vkguide.dev/
+- https://lesleylai.info/en/vk-khr-dynamic-rendering/

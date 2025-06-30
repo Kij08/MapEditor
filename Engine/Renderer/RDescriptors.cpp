@@ -131,7 +131,7 @@ VkDescriptorSet DescriptorAllocatorGrowable::AllocateDescriptorSet(VkDevice devi
     VkDescriptorSet ds;
     VkResult result = vkAllocateDescriptorSets(device, &allocInfo, &ds);
 
-    //allocation failed. Try again
+    //Try to allocate another pool
     if (result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL) {
 
         fullPools.push_back(poolToUse);
@@ -157,6 +157,7 @@ VkDescriptorPool DescriptorAllocatorGrowable::GetPool(VkDevice device) {
         newPool = CreatePool(device, setsPerPool, ratios);
 
         setsPerPool = setsPerPool * 1.5;
+        //Limit pool size to 4092
         if (setsPerPool > 4092) {
             setsPerPool = 4092;
         }

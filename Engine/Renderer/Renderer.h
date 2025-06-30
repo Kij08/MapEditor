@@ -23,7 +23,6 @@
 #include "../Primitives/Object.h"
 
 class Window;
-//The base of the Renderer class was created with help of the Vulkan Tutorial: https://vulkan-tutorial.com/Introduction
 
 class Renderer {
 
@@ -175,7 +174,10 @@ private:
 	void CreateCommandBuffers();
 	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, const std::vector<std::shared_ptr<Object>>& objects);
 
+	//Starts vulkan GPU commands and returns the command buffer
 	VkCommandBuffer BeginSingleTimeCommands();
+
+	//Executes the commands on a command buffer
 	void EndSingleTimeCommands(VkCommandBuffer CmdBuffer);
 
 	//Drawing synchronisation

@@ -1660,6 +1660,7 @@ Texture Renderer::CreateImage(uint32_t width, uint32_t height, VkFormat format, 
 
 	vmaCreateImage(vmaAllocator, &imageInfo, &vmaAllocationCreateInfo, &TexAlloc.TextureImage, &TexAlloc.TextureMem, nullptr);
 
+	//If we are making a depth image use the proper aspect flag
 	VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
 	if (format == VK_FORMAT_D32_SFLOAT) {
 		aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -1717,6 +1718,7 @@ void Renderer::TransitionImageLayout(VkImage image, VkFormat format, VkImageLayo
 	VkPipelineStageFlags sourceStage;
 	VkPipelineStageFlags destinationStage;
 
+	//Test for different layout configs and set the correct barriers
 	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
 		barrier.srcAccessMask = 0;
 		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1848,6 +1850,7 @@ MeshBuffers Renderer::UploadModel(std::span<Vertex> vertices, std::span<uint32_t
 
 	MeshBuffers meshBuffer;
 
+	//Create GPU buffers
 	meshBuffer.vertexBuffer = CreateBuffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);

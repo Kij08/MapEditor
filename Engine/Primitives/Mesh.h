@@ -21,7 +21,7 @@ struct Vertex {
     }
 };
 
-//Hash function for sotrage in map
+//Hash function for custom struct usage with std::map
 namespace std {
     template<> struct hash<Vertex> {
         size_t operator()(Vertex const& vertex) const {
