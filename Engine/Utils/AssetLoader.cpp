@@ -8,7 +8,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../include/stb_image.h"
 
-std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath, int& objTextureIndex)
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "../../include/tiny_obj_loader.h"
+
+#include <iostream>
+
+std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath)
 {
 	//If the texture is already loaded in the map then return it here
 	auto loadedTex = LoadedTextures.find(texturePath);
@@ -34,18 +39,20 @@ std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath, int&
 
 	Texture tex = Renderer::Get().CreateImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-	Renderer::Get().TransitionImageLayout(tex.Allocation->TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	Renderer::Get().CopyBufferToImage(stagingBuffer.buffer, tex.Allocation->TextureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-	Renderer::Get().TransitionImageLayout(tex.Allocation->TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	Renderer::Get().TransitionImageLayout(tex.GetAllocation().TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	Renderer::Get().CopyBufferToImage(stagingBuffer.buffer, tex.GetAllocation().TextureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+	Renderer::Get().TransitionImageLayout(tex.GetAllocation().TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	Renderer::Get().DestroyBuffer(stagingBuffer);
 
 	//Update descriptor sets
 
+	return std::make_shared<Texture>(tex);
+
 }
 
 //Loads model and returns the offset of the vertex and indeces
-std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath, int& vertexOffset, int& indexOffset, int& objVertexSize, int& objIndexSize)
+std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 {
 	//Calculate the offset for the model we are loading. If the vertex buffer is empty this is the first loaded model and the offset is 0.
 	//If its not empty the offset starts at array.size()
@@ -57,23 +64,17 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath, int& vertexO
 		return loadedMesh->second;
 	}
 
-	if (vertices.size() == 0) {
-		vertexOffset = 0;
-		indexOffset = 0;
-	}
-	else {
-		vertexOffset = vertices.size();
-		indexOffset = indices.size();
-	}
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
 
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
-	std::string warn, err;
+	std::string err;
 
 	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err,modelPath.c_str())) {
 		std::cout << "Could not load model";
-		throw std::runtime_error(warn + err);
+		throw std::runtime_error(err);
 	}
 
 	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
@@ -82,25 +83,28 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath, int& vertexO
 		for (const auto& index : shape.mesh.indices) {
 			Vertex vertex{};
 
-			vertex.mesh.pos = {
+			//Array of floats so we need an offset of 3
+			vertex.pos = {
 				attrib.vertices[3 * index.vertex_index + 0],
 				attrib.vertices[3 * index.vertex_index + 1],
 				attrib.vertices[3 * index.vertex_index + 2]
 			};
 
-			vertex.mesh.uv = {
+			//Array of floats so we need an offset of 2. Flip UV Y for vulkan
+			vertex.uv = {
 				attrib.texcoords[2 * index.texcoord_index + 0],
 				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
 			};
 
-			vertex.mesh.normal = {
+			vertex.normal = {
 				attrib.normals[3 * index.normal_index + 0],
 				attrib.normals[3 * index.normal_index + 1],
 				attrib.normals[3 * index.normal_index + 2]
 			};
 
-			vertex.mesh.colour = { 1.0f, 1.0f, 1.0f };
+			vertex.colour = { 1.0f, 1.0f, 1.0f };
 
+			//If vertex isnt in uniquevertices set its index to its index in verticies and add it. If its already in just add its index to indicies.
 			if (uniqueVertices.count(vertex) == 0) {
 				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
 
@@ -111,19 +115,18 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath, int& vertexO
 		}
 	}
 
-	//after arrays are filled calculate the size of the object in the vertex and index buffer
-	objVertexSize = vertices.size() - vertexOffset;
-	objIndexSize = indices.size() - indexOffset;
-	UpdateVertexBuffer(vertexOffset, objVertexSize);
-	UpdateIndexBuffer(indexOffset, objIndexSize);
+	//Upload mesh to GPU
+	Mesh mesh(Renderer::Get().UploadModel(vertices, indices));
+	return std::make_shared<Mesh>(mesh);
+}
 
-	ModelCacheData data;
-	data.path = modelPath;
-	data.vertexOffset = vertexOffset;
-	data.vertexSize = objVertexSize;
-	data.indexOffset = indexOffset;
-	data.indexSize = objIndexSize;
+void AssetManager::LoadObject(Object *obj) {
+	std::shared_ptr<Mesh> mesh = LoadMesh(obj->GetModelPath());
+	std::shared_ptr<Texture> texture = LoadTexture(obj->GetTexturePath());
 
-	ModelCache.push_back(data);
+	obj->SetMesh(mesh);
+	obj->SetTexture(texture);
 
+	LoadedMeshes.emplace(obj->GetModelPath(), mesh);
+	LoadedTextures.emplace(obj->GetTexturePath(), texture);
 }

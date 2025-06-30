@@ -14,13 +14,6 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/gtc/matrix_transform.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "../../include/stb_image.h"
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "../../include/tiny_obj_loader.h"
-
-
 Renderer* loadedRenderer = nullptr;
 
 Renderer& Renderer::Get() { return *loadedRenderer; }
@@ -62,17 +55,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
 	return VK_FALSE;
 }
-
-namespace std {
-	template<> struct hash<Renderer::Vertex> {
-		size_t operator()(Renderer::Vertex const& vertex) const {
-			return ((hash<glm::vec3>()(vertex.mesh.pos) ^
-				(hash<glm::vec3>()(vertex.mesh.colour) << 1)) >> 1) ^
-				(hash<glm::vec2>()(vertex.mesh.uv) << 1);
-		}
-	};
-}
-
 //--------GLFW Functions
 
 void Renderer::Terminate()
@@ -108,8 +90,6 @@ void Renderer::Terminate()
 	vkDestroyPipelineLayout(device, UnlitPipelineLayout, nullptr);
 	vkDestroyPipeline(device, GraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(device, PipelineLayout, nullptr);
-
-	vkDestroyRenderPass(device, RenderPass, nullptr);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(device, RenderFinishedSemaphores[i], nullptr);
@@ -155,12 +135,10 @@ void Renderer::Startup() {
 	CreateVulkanAllocator();
 	CreateSwapChain();
 	CreateImageViews();
-	CreateRenderPass();
 	CreateDescriptorSetLayout();
 	CreateGraphicsPipeline();
 	CreateUnlitPipeline();
 	CreateDepthResources();
-	CreateFrameBuffers();
 	CreateCommandPool();
 	CreateTextureSampler();
 	CreateVertexBuffer();
@@ -678,17 +656,12 @@ void Renderer::RecreateSwapChain()
 	CreateSwapChain();
 	CreateImageViews();
 	CreateDepthResources();
-	CreateFrameBuffers();
 }
 
 void Renderer::CleanupSwapChain()
 {
-	vkDestroyImageView(device, DepthTexture.Allocation.TextureImageView, nullptr);
-	vmaDestroyImage(vmaAllocator, DepthTexture.Allocation.TextureImage, DepthTexture.Allocation.TextureMem);
-
-	for (auto framebuffer : swapChainFramebuffers) {
-		vkDestroyFramebuffer(device, framebuffer, nullptr);
-	}
+	vkDestroyImageView(device, DepthTexture.GetAllocation().TextureImageView, nullptr);
+	vmaDestroyImage(vmaAllocator, DepthTexture.GetAllocation().TextureImage, DepthTexture.GetAllocation().TextureMem);
 
 	for (auto imageView : swapChainImageViews) {
 		vkDestroyImageView(device, imageView, nullptr);
@@ -904,15 +877,8 @@ void Renderer::CreateUnlitPipeline()
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
-	VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-	auto attributeDescriptions = Vertex::getAttributeDescriptions();
-
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 1;
-	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());;
-	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -1036,7 +1002,7 @@ void Renderer::CreateUnlitPipeline()
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = &dynamicState;
 	pipelineInfo.layout = UnlitPipelineLayout;
-	pipelineInfo.renderPass = RenderPass;
+	pipelineInfo.renderPass = VK_NULL_HANDLE;
 	pipelineInfo.subpass = 0;
 
 	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &UnlitPipeline) != VK_SUCCESS) {
@@ -1060,89 +1026,6 @@ VkShaderModule Renderer::CreateShaderModule(const std::vector<char>& code)
 	}
 
 	return shaderModule;
-}
-
-void Renderer::CreateRenderPass()
-{
-	VkAttachmentDescription colorAttachment{};
-	colorAttachment.format = swapChainImageFormat;
-	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-	VkAttachmentDescription depthAttachment{};
-	depthAttachment.format = FindDepthFormat();
-	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentReference colorAttachmentRef{};
-	colorAttachmentRef.attachment = 0;
-	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentReference depthAttachmentRef{};
-	depthAttachmentRef.attachment = 1;
-	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	VkSubpassDescription subpass{};
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentRef;
-	subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-	VkSubpassDependency dependency{};
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency.srcAccessMask = 0;
-	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-	std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
-	VkRenderPassCreateInfo renderPassInfo{};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	renderPassInfo.pAttachments = attachments.data();
-	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = &subpass;
-	renderPassInfo.dependencyCount = 1;
-	renderPassInfo.pDependencies = &dependency;
-
-	if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &RenderPass) != VK_SUCCESS) {
-		throw std::runtime_error("Could not create render pass!");
-	}
-}
-
-void Renderer::CreateFrameBuffers()
-{
-	swapChainFramebuffers.resize(swapChainImageViews.size());
-	for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-		std::array<VkImageView, 2> attachments = {
-			swapChainImageViews[i],
-			DepthImageView
-		};
-
-		VkFramebufferCreateInfo framebufferInfo{};
-		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		framebufferInfo.renderPass = RenderPass;
-		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-		framebufferInfo.pAttachments = attachments.data();
-		framebufferInfo.width = swapChainExtent.width;
-		framebufferInfo.height = swapChainExtent.height;
-		framebufferInfo.layers = 1;
-
-		if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
-			throw std::runtime_error("Could not create framebuffer!");
-		}
-	}
 }
 
 void Renderer::CreateCommandPool()
@@ -1216,7 +1099,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 		.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 		.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-		.image = DepthTexture.Allocation->TextureImage,
+		.image = DepthTexture.GetAllocation().TextureImage,
 		.subresourceRange = {
 			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
 			.baseMipLevel = 0,
@@ -1256,7 +1139,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 
 	const VkRenderingAttachmentInfoKHR DepthAttachInfo {
 		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
-		.imageView = DepthTexture.Allocation->TextureImageView,
+		.imageView = DepthTexture.GetAllocation().TextureImageView,
 		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
 		.resolveMode = VK_RESOLVE_MODE_NONE,
 		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -1337,7 +1220,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UnlitPipelineLayout, 0, 1, &DescriptorSets[currentFrame][obj->GetDescriptorIndex()], 0, nullptr);
 		}*/
 
-		vkCmdDrawIndexed(CmdBuffer, static_cast<uint32_t>(obj->GetIndexSizeInBuffer()), 1, obj->GetIndexOffset(), 0, 0);
+		//vkCmdDrawIndexed(CmdBuffer, static_cast<uint32_t>(obj->GetIndexSizeInBuffer()), 1, obj->GetIndexOffset(), 0, 0);
 	}
 
 
@@ -1451,30 +1334,6 @@ void Renderer::CreateSyncObjects()
 
 Renderer::VmaBuffer Renderer::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flags)
 {
-	/*VkBufferCreateInfo bufferInfo{};
-	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = size;
-	bufferInfo.usage = usage;
-	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-		throw std::runtime_error("Could not create buffer!");
-	}
-
-	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-
-	VkMemoryAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
-
-	if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-		throw std::runtime_error("Could not allocate buffer memory!");
-	}
-
-	vkBindBufferMemory(device, buffer, bufferMemory, 0);*/
-
 	VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
 	bufferInfo.pNext = nullptr;
 	bufferInfo.size = size;
@@ -1482,7 +1341,7 @@ Renderer::VmaBuffer Renderer::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags
 
 	VmaAllocationCreateInfo vmaAllocInfo = {};
 	vmaAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-	vmaAllocInfo.flags = flags | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	vmaAllocInfo.flags = flags;
 	VmaBuffer newBuffer;
 
 	vmaCreateBuffer(vmaAllocator, &bufferInfo, &vmaAllocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.info);
@@ -1552,80 +1411,6 @@ uint32_t Renderer::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pro
 	throw std::runtime_error("Could not find suitable memory type!");
 }
 
-void Renderer::CreateVertexBuffer()
-{
-
-	//VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
-
-
-	CreateBuffer(vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-
-}
-
-void Renderer::UpdateVertexBuffer(int newObjVertexOffset, int newObjVertexSize)
-{
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-
-	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
-
-	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-	//Recopy whole vertex array to the staging buffer, but only copy the obj offset to end of obj offset to actual vertex buffer
-	void* data;
-	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, vertices.data(), (size_t)bufferSize);
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-	std::cout << "Vertex" << newObjVertexOffset << " -- " << newObjVertexSize << "\n";
-
-	VkBufferCopy copyRegion{};
-	copyRegion.srcOffset = newObjVertexOffset; //Only copy the from the start of the staging buffer offset
-	copyRegion.dstOffset = currentVertexBufferOffset; //Write new vertex data at the end of the vertex buffer
-	copyRegion.size = bufferSize - newObjVertexOffset;
-	vkCmdCopyBuffer(commandBuffer, stagingBuffer, VertexBuffer, 1, &copyRegion);
-	currentVertexBufferOffset += newObjVertexSize; //Set vertex buffer offset to offset + the size of the object vertices being copied
-	EndSingleTimeCommands(commandBuffer);
-
-	vkDestroyBuffer(device, stagingBuffer, nullptr);
-	vkFreeMemory(device, stagingBufferMemory, nullptr);
-}
-
-void Renderer::CreateIndexBuffer()
-{
-	CreateBuffer(indexBuferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, IndexBuffer, IndexBufferMemory);
-}
-
-void Renderer::UpdateIndexBuffer(int newObjIndexOffset, int newObjIndexSize)
-{
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-
-	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-
-	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, indices.data(), (size_t)bufferSize);
-	vkUnmapMemory(device, stagingBufferMemory); //No point in unmapping memory apparently
-
-
-	VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-	std::cout << "Index" << newObjIndexOffset << " -- " << newObjIndexSize << "\n";
-	VkBufferCopy copyRegion{};
-	copyRegion.srcOffset = newObjIndexOffset; //Only copy the from the start of the staging buffer offset
-	copyRegion.dstOffset = currentIndexBufferOffset; //Write new vertex data at the end of the vertex buffer
-	copyRegion.size = bufferSize - newObjIndexOffset; //THis is not buffer size but size - offset * size0f(data????)
-	vkCmdCopyBuffer(commandBuffer, stagingBuffer, IndexBuffer, 1, &copyRegion);
-	currentIndexBufferOffset += newObjIndexSize; //Set vertex buffer offset to offset + the size of the object vertices being copied
-	EndSingleTimeCommands(commandBuffer);
-
-	vkDestroyBuffer(device, stagingBuffer, nullptr);
-	vkFreeMemory(device, stagingBufferMemory, nullptr);
-}
-
 void Renderer::CreateUniformBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
@@ -1635,7 +1420,7 @@ void Renderer::CreateUniformBuffer()
 	UniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT);
+		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 	}
 
 	UpdateUniformBuffer();
@@ -1875,32 +1660,14 @@ Texture Renderer::CreateImage(uint32_t width, uint32_t height, VkFormat format, 
 
 	vmaCreateImage(vmaAllocator, &imageInfo, &vmaAllocationCreateInfo, &TexAlloc.TextureImage, &TexAlloc.TextureMem, nullptr);
 
-	/*if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
-		throw std::runtime_error("Could not to create image!");
-	}
-
-	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(device, image, &memRequirements);
-
-	VkMemoryAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
-
-	if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
-		throw std::runtime_error("Could not allocate image memory!");
-	}
-
-	vkBindImageMemory(device, image, imageMemory, 0);*/
-
 	VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
 	if (format == VK_FORMAT_D32_SFLOAT) {
 		aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
 	}
 
-	TexAlloc.TextureImageView = CreateImageView(TexAlloc.TextureImage, VK_FORMAT_R8G8B8A8_SRGB, aspectFlag);
+	TexAlloc.TextureImageView = CreateImageView(TexAlloc.TextureImage, format, aspectFlag);
 
-	Texture Tex {.Allocation = TexAlloc};
+	Texture Tex(TexAlloc);
 	return Tex;
 }
 
@@ -2044,7 +1811,7 @@ void Renderer::CreateTextureSampler()
 void Renderer::CreateDepthResources()
 {
 	VkFormat depthFormat = FindDepthFormat();
-	DepthTexture = CreateImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	DepthTexture = CreateImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
 VkFormat Renderer::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
@@ -2075,94 +1842,45 @@ bool Renderer::HasStencilComponent(VkFormat format) {
 	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
-//Loads model and returns the offset of the vertex and indeces
-void Renderer::LoadModel(int& vertexOffset, int& indexOffset, int& objVertexSize, int& objIndexSize, std::string modelPath)
-{
-	//Calculate the offset for the model we are loading. If the vertex buffer is empty this is the first loaded model and the offset is 0.
-	//If its not empty the offset starts at array.size()
+MeshBuffers Renderer::UploadModel(std::span<Vertex> vertices, std::span<uint32_t> indices) {
+	const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
+	const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-	std::cout << "Now loading: " << modelPath << "\n";
+	MeshBuffers meshBuffer;
 
-	//If the model cache is not empty, check the incoming path. If its in the cache jsut return the offsets for the verts
-	if (ModelCache.size() != 0) {
-		for (ModelCacheData data : ModelCache) {
-			if (data.path.compare(modelPath) == 0) {
-				vertexOffset = data.vertexOffset;
-				objVertexSize = data.vertexSize;
-				indexOffset = data.indexOffset;
-				objIndexSize = data.indexSize;
-				return;
-			}
-		}
-	}
+	meshBuffer.vertexBuffer = CreateBuffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
 
-	if (vertices.size() == 0) {
-		vertexOffset = 0;
-		indexOffset = 0;
-	}
-	else {
-		vertexOffset = vertices.size();
-		indexOffset = indices.size();
-	}
+	VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = meshBuffer.vertexBuffer.buffer };
+	meshBuffer.vertexBufferAddress = vkGetBufferDeviceAddress(device, &deviceAddressInfo);
 
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-	std::string warn, err;
+	meshBuffer.indexBuffer = CreateBuffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
 
-	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err,modelPath.c_str())) {
-		std::cout << "Could not load model";
-		throw std::runtime_error(warn + err);
-	}
 
-	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+	//Copy vert and index buffers to GPU buffers
+	VmaBuffer stagingBuffer = CreateBuffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
-	for (const auto& shape : shapes) {
-		for (const auto& index : shape.mesh.indices) {
-			Vertex vertex{};
+	VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 
-			vertex.mesh.pos = {
-				attrib.vertices[3 * index.vertex_index + 0],
-				attrib.vertices[3 * index.vertex_index + 1],
-				attrib.vertices[3 * index.vertex_index + 2]
-			};
+	VkBufferCopy vertexCopy{ 0 };
+	vertexCopy.dstOffset = 0;
+	vertexCopy.srcOffset = 0;
+	vertexCopy.size = vertexBufferSize;
 
-			vertex.mesh.uv = {
-				attrib.texcoords[2 * index.texcoord_index + 0],
-				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-			};
+	vkCmdCopyBuffer(commandBuffer, stagingBuffer.buffer, meshBuffer.vertexBuffer.buffer, 1, &vertexCopy);
 
-			vertex.mesh.normal = {
-				attrib.normals[3 * index.normal_index + 0],
-				attrib.normals[3 * index.normal_index + 1],
-				attrib.normals[3 * index.normal_index + 2]
-			};
+	VkBufferCopy indexCopy{ 0 };
+	indexCopy.dstOffset = 0;
+	indexCopy.srcOffset = vertexBufferSize;
+	indexCopy.size = indexBufferSize;
 
-			vertex.mesh.colour = { 1.0f, 1.0f, 1.0f };
+	vkCmdCopyBuffer(commandBuffer, stagingBuffer.buffer, meshBuffer.indexBuffer.buffer, 1, &indexCopy);
 
-			if (uniqueVertices.count(vertex) == 0) {
-				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+	EndSingleTimeCommands(commandBuffer);
 
-				vertices.push_back(vertex);
-			}
+	DestroyBuffer(stagingBuffer);
 
-			indices.push_back(uniqueVertices[vertex]);
-		}
-	}
-
-	//after arrays are filled calculate the size of the object in the vertex and index buffer
-	objVertexSize = vertices.size() - vertexOffset;
-	objIndexSize = indices.size() - indexOffset;
-	UpdateVertexBuffer(vertexOffset, objVertexSize);
-	UpdateIndexBuffer(indexOffset, objIndexSize);
-
-	ModelCacheData data;
-	data.path = modelPath;
-	data.vertexOffset = vertexOffset;
-	data.vertexSize = objVertexSize;
-	data.indexOffset = indexOffset;
-	data.indexSize = objIndexSize;
-
-	ModelCache.push_back(data);
-
+	return meshBuffer;
 }

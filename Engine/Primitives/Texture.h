@@ -16,10 +16,17 @@ struct TextureAllocation {
     VkSampler TextureSampler;
 };
 
-struct Texture {
+class Texture {
+public:
 
+    Texture(const TextureAllocation& tAlloc) {
+      Allocation = tAlloc;
+    };
 
-    TextureAllocation* Allocation;
+    TextureAllocation& GetAllocation() { return Allocation; };
+
+private:
+    TextureAllocation Allocation;
 
 
 };

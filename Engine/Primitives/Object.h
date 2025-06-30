@@ -26,21 +26,13 @@ class Object {
 public:
 
 protected:
-	Mesh mesh;
-
+	std::shared_ptr<Mesh> Mesh;
+	std::shared_ptr<Texture> Texture;
+	std::shared_ptr<Material> Material;
 	Transform objTransform;
 
 	std::string PATH_TO_MODEL = "";
 	std::string PATH_TO_TEXTURE = "";
-
-	//TODO: Move this stuff to model/texture classes
-	int modelVertexStartOffset;
-	int modelVertexSizeInBuffer;
-	int modelIndexStartOffset;
-	int modelIndexSizeInBuffer;
-
-	//Index for descriptor set AND for texture image arrays
-	int descriptorSetIndex;
 
 	//TODO: move to Material
 	float Ka = 0;
@@ -48,6 +40,9 @@ protected:
 	float Ks = 0;
 
 public:
+	void SetMesh(std::shared_ptr<class Mesh> m) { Mesh = m; };
+	void SetTexture(std::shared_ptr<class Texture> m) { Texture = m; };
+
 	const Transform GetTransform() { return objTransform; };
 	void SetTransform(Transform t) { objTransform = t; };
 
@@ -56,22 +51,6 @@ public:
 
 	void SetLevelReference(Scene* scene) { SceneRef = scene; }
 	Scene* GetLevel() { return SceneRef; };
-
-	void SetVertOffset(int offset) { modelVertexStartOffset = offset; };
-	void SetVertSizeInBuffer(int size) { modelVertexSizeInBuffer = size; };
-	void SetIndexOffset(int offset) { modelIndexStartOffset = offset; };
-	void SetIndexSizeInOffset(int size) { modelIndexSizeInBuffer = size; };
-	void SetDescriptorSetIndex(int index) { descriptorSetIndex = index; };
-
-	const int GetVertOffset() { return modelVertexStartOffset; };
-	const int GetVertSizeInBuffer() { return modelVertexSizeInBuffer; };
-	const int GetIndexOffset() { return modelIndexStartOffset; };
-	const int GetIndexSizeInBuffer() { return modelIndexSizeInBuffer; };
-	const int GetDescriptorIndex() { return descriptorSetIndex; };
-
-	const Mesh GetMesh() { return mesh; }
-	void AddVertToObjMesh(Mesh::MeshData vert) { mesh.vertices.push_back(vert); };
-	void AddIndexToObjMesh(uint32_t index) { mesh.indices.push_back(index); };
 
 	float GetKa() const { return Ka; }
 	float GetKd() { return Kd; }

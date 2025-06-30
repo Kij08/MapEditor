@@ -12,6 +12,8 @@ TObject* Scene::CreateObject() {
     static_assert(std::is_base_of<Object, TObject>::value, "Not an Object");
 
     TObject* obj = new TObject();
+    obj->SetLevelReference(this);
+    objects.insert(obj);
     sceneAssetManager.LoadObject(obj);
     return obj;
 }

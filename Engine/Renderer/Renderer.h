@@ -16,6 +16,8 @@
 #include <memory>
 
 #define VMA_IMPLEMENTATION
+#include <span>
+
 #include "../../include/vk_mem_alloc.h"
 
 #include "../Primitives/Object.h"
@@ -53,7 +55,7 @@ public:
 	};
 
 	//Loading Models
-	void LoadModel(int& vertexOffset, int& indexOffset, int& objVertexSize, int& objIndexSize, std::string modelPath);
+	MeshBuffers UploadModel(std::span<Vertex> vertices, std::span<uint32_t> indices);
 	//IMplement later: Renderer should have a list of weak pointers to mesh data so it doesn't have to keep loading the asteroid data
 	void LoadTexture(std::string texturePath, int& objTextureIndex);
 
@@ -164,14 +166,6 @@ private:
 
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 
-	//Render Pass
-	VkRenderPass RenderPass;
-	void CreateRenderPass();
-
-	//Frame buffers
-	std::vector<VkFramebuffer> swapChainFramebuffers;
-	void CreateFrameBuffers();
-
 	//Command Pool
 	VkCommandPool CommandPool;
 	void CreateCommandPool();
@@ -215,9 +209,10 @@ private:
 	int currentIndexBufferOffset = 0;
 
 public:
-	//For staging buffer: Use VK_BUFFER_USAGE_TRANSFER_SRC_BIT usage. VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT flag.
-	//For readback from compute: same usage. VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT flag
-	//For uniform buffer VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT flag
+	//For GPU resource: VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT flag
+	//For staging buffer: Use VK_BUFFER_USAGE_TRANSFER_SRC_BIT usage. VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT flag.
+	//For readback from compute: same usage. VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT flag
+	//For uniform buffer VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT flag
 	VmaBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flags);
 
 	void DestroyBuffer(const VmaBuffer& buffer);

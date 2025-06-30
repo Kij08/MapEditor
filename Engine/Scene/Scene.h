@@ -17,6 +17,7 @@ class Scene {
 protected:
     //List of all objects, grouped by material
     std::vector<ObjectMaterialGrouping> materialGroupings;
+    std::vector<std::shared_ptr<Object>> objects;
 
     AssetManager sceneAssetManager;
 private:
