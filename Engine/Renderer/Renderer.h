@@ -5,24 +5,19 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "RTypes.h"
+
+
 #include <optional>
 #include <fstream>
-#include <array>
-#include "../Primitives/Mesh.h"
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
+#include <vector>
 #include <memory>
-
-#define VMA_IMPLEMENTATION
 #include <span>
-
-#include "../../include/vk_mem_alloc.h"
-
-#include "../Primitives/Object.h"
+#include "RDescriptors.h"
+#include "../Primitives/Texture.h"
 
 class Window;
+
 
 class Renderer {
 
@@ -40,28 +35,28 @@ public:
 	void Startup();
 	GLFWwindow* GetWindow() { return windowRef; }
 
-	void DrawFrame(const std::vector<std::shared_ptr<Object>>& objects);
+	void DrawFrame(const std::vector<std::shared_ptr<class Object>>& objects);
 
 	VkDevice GetDevice() { return device; };
 
 	void SetFrameBufferResized(bool resized) { framebufferResized = resized; };
 
 
-	struct VmaBuffer {
-		VkBuffer buffer;
-		VmaAllocation allocation;
-		VmaAllocationInfo info;
+	struct FrameData {
+		VmaBuffer UniformBuffer;
+		DescriptorAllocatorGrowable Descriptors;
 	};
 
 	//Loading Models
-	MeshBuffers UploadModel(std::span<Vertex> vertices, std::span<uint32_t> indices);
-	//IMplement later: Renderer should have a list of weak pointers to mesh data so it doesn't have to keep loading the asteroid data
-	void LoadTexture(std::string texturePath, int& objTextureIndex);
+	struct MeshBuffers UploadModel(std::span<struct Vertex> vertices, std::span<uint32_t> indices);
+
 
 private:
-	const int MAX_FRAMES_IN_FLIGHT = 2;
+	constexpr static int MAX_FRAMES_IN_FLIGHT = 2;
 	uint32_t currentFrame = 0;
 	bool framebufferResized = false;
+
+	FrameData frames[MAX_FRAMES_IN_FLIGHT];
 
 	const std::vector<const char*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation"
@@ -170,7 +165,7 @@ private:
 	void CreateCommandPool();
 
 	//Command Buffer
-	std::vector<VkCommandBuffer> CommandBuffers;
+	std::vector<VkCommandBuffer> CommandBuffers; //TODO: Move to frame data struct
 	void CreateCommandBuffers();
 	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, const std::vector<std::shared_ptr<Object>>& objects);
 
@@ -186,30 +181,6 @@ private:
 	std::vector<VkFence> InFlightFences;
 	void CreateSyncObjects();
 
-	//Vertex Processing
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-
-	//Buffers
-	VkBuffer VertexBuffer;
-	VkDeviceMemory VertexBufferMemory;
-	VkBuffer IndexBuffer;
-	VkDeviceMemory IndexBufferMemory;
-
-	//Buffer for objs loaded and objs spawned during play
-	VmaBuffer LoadedObjVertexBuffer;
-	VmaBuffer LoadedObjIndexBuffer;
-	VmaBuffer TransientObjVertexBuffer;
-	VmaBuffer TransientObjIndexBuffer;
-
-	std::vector<VkBuffer> UniformBuffers; //Objects share the same UBOs since it just has proj and view info in it.
-	std::vector<VkDeviceMemory> UniformBuffersMemory;
-	std::vector<void*> UniformBuffersMapped;
-	VkDeviceSize vertexBufferSize = 100000000; //allocate 100 megabytes for fun
-	VkDeviceSize indexBuferSize = 100000000; //allocate 100 megabytes for fun
-	int currentVertexBufferOffset = 0;
-	int currentIndexBufferOffset = 0;
-
 public:
 	//For GPU resource: VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT flag
 	//For staging buffer: Use VK_BUFFER_USAGE_TRANSFER_SRC_BIT usage. VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT flag.
@@ -221,10 +192,6 @@ public:
 	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
-	void CreateVertexBuffer();
-	void UpdateVertexBuffer(int newObjVertexOffset, int newObjVertexSize);
-	void CreateIndexBuffer();
-	void UpdateIndexBuffer(int newObjIndexOffset, int newObjIndexSize);
 	void CreateUniformBuffer();
 
 private:
@@ -232,6 +199,8 @@ private:
 	VkDescriptorSetLayout DescriptorSetLayout;
 	VkDescriptorPool DescriptorPool;
 	std::vector<std::vector<VkDescriptorSet>> DescriptorSets; //Vector of vectors for obj descriptor sets. Each frame in flight has a sometimes differing set of the obj sets
+
+	void InitDescriptors();
 
 	void CreateDescriptorSetLayout();
 	void CreateDescriptorPool();
@@ -248,7 +217,7 @@ private:
 
 	struct MeshPushConstant {
 		glm::mat4 modelMatrix;
-
+		VkDeviceAddress vBufAddress;
 		float Ka;
 		float Kd;
 		float Ks;
@@ -273,17 +242,6 @@ public:
 
 	void CreateTextureSampler();
 private:
-	struct TextureCacheData {
-		std::string path;
-		int indexInTexArray;
-	};
-
-	std::vector<TextureCacheData> TextureCache;
-
-	//Depth buffer
-	/*VkImage DepthImage;
-	VkDeviceMemory DepthImageMemory;
-	VkImageView DepthImageView;*/
 
 	Texture DepthTexture;
 
@@ -293,15 +251,6 @@ private:
 	VkFormat FindDepthFormat();
 	bool HasStencilComponent(VkFormat format);
 
-	struct ModelCacheData {
-		std::string path;
-		int vertexOffset;
-		int indexOffset;
-		int vertexSize;
-		int indexSize;
-	};
-
-	std::vector<ModelCacheData> ModelCache;
 };
 
 #endif //RENDERER_H

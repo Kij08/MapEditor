@@ -5,7 +5,7 @@
 #ifndef RDESCRIPTORS_H
 #define RDESCRIPTORS_H
 
-#include "Renderer.h"
+#include "RTypes.h"
 #include <span>
 #include <deque>
 

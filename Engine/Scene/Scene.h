@@ -19,6 +19,7 @@ protected:
     std::vector<ObjectMaterialGrouping> materialGroupings;
     std::vector<std::shared_ptr<Object>> objects;
 
+    //Asset manager for all objects in this scene
     AssetManager sceneAssetManager;
 private:
 
@@ -28,6 +29,8 @@ public:
 
     template<class TObject>
     TObject* CreateObject();
+
+    const std::vector<std::shared_ptr<Object>>& GetObjectList() { return objects; }
 };
 
 #endif //SCENE_H

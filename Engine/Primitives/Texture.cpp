@@ -3,4 +3,3 @@
 //
 
 #include "Texture.h"
-#include <stdexcept>

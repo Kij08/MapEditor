@@ -5,10 +5,8 @@
 #ifndef MESH_H
 #define MESH_H
 
-#include <array>
 #include <vector>
-#include "glm/glm.hpp"
-#include "../Renderer/Renderer.h"
+#include "../Renderer/RTypes.h"
 
 struct Vertex {
     glm::vec3 pos;
@@ -34,8 +32,8 @@ namespace std {
 
 
 struct MeshBuffers {
-    Renderer::VmaBuffer vertexBuffer;
-    Renderer::VmaBuffer indexBuffer;
+    VmaBuffer vertexBuffer;
+    VmaBuffer indexBuffer;
     VkDeviceAddress vertexBufferAddress;
 };
 
@@ -49,6 +47,8 @@ public:
     Mesh(const MeshBuffers& mBuffer) {
         buffers = mBuffer;
     }
+
+    const VkDeviceAddress& GetVertexBufferAddress() { return buffers.vertexBufferAddress; }
 private:
 
     MeshBuffers buffers;

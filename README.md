@@ -22,6 +22,9 @@ has turned into more of a custom game engine.
 - VMA
 - ImGUI
 
+# Dependencies
+- Vulkan 1.4
+
 Developed and tested on Linux.
 
 Shoutout to these sites for providing tutorials, explanations, and code:

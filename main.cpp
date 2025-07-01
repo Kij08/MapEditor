@@ -1,23 +1,20 @@
 #include "Engine/Renderer/Renderer.h"
+#include "Engine/Scene/Scene.h"
+void mainLoop(Scene* scene) {
 
-void mainLoop(Renderer* r) {
-    while (!glfwWindowShouldClose(r->GetWindow())) {
+    Renderer& r = Renderer::Get();
+    while (!glfwWindowShouldClose(r.GetWindow())) {
 
         glfwPollEvents();
 
-        //lvl->SimulateWorld();
-        r->DrawFrame(lvl->GetWorldList());
+        r.DrawFrame(scene->GetObjectList());
     }
 
-    vkDeviceWaitIdle(r->GetDevice());
+    vkDeviceWaitIdle(r.GetDevice());
 }
 
 int main() {
-    Renderer r;
-
-    r.Startup();
-
-    mainLoop(&r);
-
-    r.Terminate();
+    Scene s;
+    s.InitScene();
+    mainLoop(&s);
 }

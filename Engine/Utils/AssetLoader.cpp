@@ -3,7 +3,7 @@
 //
 
 #include "AssetLoader.h"
-#include "../Primitives/Texture.h"
+#include "../Primitives/Object.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../include/stb_image.h"
@@ -31,7 +31,7 @@ std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath)
 		throw std::runtime_error("Could not load texture image!");
 	}
 
-	Renderer::VmaBuffer stagingBuffer = Renderer::Get().CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+	VmaBuffer stagingBuffer = Renderer::Get().CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
 	//Copy pixel mem to buffer then free the raw data
 	memcpy(stagingBuffer.info.pMappedData, pixels, imageSize);

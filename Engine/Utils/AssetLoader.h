@@ -17,10 +17,10 @@ struct ModelLoader {
 
 class AssetManager {
     std::unordered_map<std::string, std::shared_ptr<Texture>> LoadedTextures;
-    std::unordered_map<std::string, std::shared_ptr<Mesh>> LoadedMeshes;
+    std::unordered_map<std::string, std::shared_ptr<class Mesh>> LoadedMeshes;
 
     std::shared_ptr<Texture> LoadTexture(std::string texturePath);
-    std::shared_ptr<Mesh> LoadMesh(std::string modelPath);
+    std::shared_ptr<class Mesh> LoadMesh(std::string modelPath);
 
 public:
     AssetManager();

@@ -26,9 +26,9 @@ class Object {
 public:
 
 protected:
-	std::shared_ptr<Mesh> Mesh;
-	std::shared_ptr<Texture> Texture;
-	std::shared_ptr<Material> Material;
+	std::shared_ptr<Mesh> MeshRef;
+	std::shared_ptr<Texture> TextureRef;
+	std::shared_ptr<Material> MaterialRef;
 	Transform objTransform;
 
 	std::string PATH_TO_MODEL = "";
@@ -40,8 +40,11 @@ protected:
 	float Ks = 0;
 
 public:
-	void SetMesh(std::shared_ptr<class Mesh> m) { Mesh = m; };
-	void SetTexture(std::shared_ptr<class Texture> m) { Texture = m; };
+	void SetMesh(std::shared_ptr<Mesh> m) { MeshRef = m; };
+	void SetTexture(std::shared_ptr<Texture> m) { TextureRef = m; };
+
+	Mesh* GetMesh() { return MeshRef.get(); };
+	Texture* GetTexture() { return TextureRef.get(); };
 
 	const Transform GetTransform() { return objTransform; };
 	void SetTransform(Transform t) { objTransform = t; };

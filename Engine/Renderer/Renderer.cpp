@@ -8,8 +8,7 @@
 #include <limits>
 #include <algorithm>
 #include <iostream>
-#include <unordered_map>
-
+#include "../Primitives/Object.h"
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/gtc/matrix_transform.hpp>
@@ -68,19 +67,8 @@ void Renderer::Terminate()
 		vkFreeMemory(device, TextureImageMemories[i], nullptr);
 	}
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vkDestroyBuffer(device, UniformBuffers[i], nullptr);
-		vkFreeMemory(device, UniformBuffersMemory[i], nullptr);
-	}
-
 	vkDestroyDescriptorPool(device, DescriptorPool, nullptr);
 	vkDestroyDescriptorSetLayout(device, DescriptorSetLayout, nullptr);
-
-	vkDestroyBuffer(device, IndexBuffer, nullptr);
-	vkFreeMemory(device, IndexBufferMemory, nullptr);
-
-	vkDestroyBuffer(device, VertexBuffer, nullptr);
-	vkFreeMemory(device, VertexBufferMemory, nullptr);
 
 	vkDestroyCommandPool(device, CommandPool, nullptr);
 
@@ -141,8 +129,6 @@ void Renderer::Startup() {
 	CreateDepthResources();
 	CreateCommandPool();
 	CreateTextureSampler();
-	CreateVertexBuffer();
-	CreateIndexBuffer();
 	CreateUniformBuffer();
 	CreateDescriptorPool();
 	CreateDescriptorSets();
@@ -1176,22 +1162,26 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 	scissor.extent = swapChainExtent;
 	vkCmdSetScissor(CmdBuffer, 0, 1, &scissor);
 
-	VkBuffer vertexBuffers[] = { VertexBuffer };
-	//std::vector<VkDeviceSize> offsets;
-	VkDeviceSize offsets[] = { 0 };
 
-	//for (Object* obj : objects) {
-	//	offsets.push_back(obj->GetVertOffset());
-	//}
-
-	vkCmdBindVertexBuffers(CmdBuffer, 0, 1, vertexBuffers, offsets);
-	vkCmdBindIndexBuffer(CmdBuffer, IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+	//Bind lit pipeline
+	vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
 
 	//Make vertex buffer big and put all object verts in there, if it ever gets too small double its size using the same createVertexBuffer() workflow
 	//Need to store the offsets for each object, be able to remove and add objects to vert and index array
 	//UpdateUniformBuffer(currentFrame, obj->GetTransform().position, obj->GetTransform().rotation, obj->GetTransform().scale);
 
 	for (auto const& obj : objects) {
+		TextureAllocation objTex = obj.get()->GetTexture()->GetAllocation();
+		//Dynamically allocate descriptors for obj textures. Use global set layout
+		VkDescriptorSet imageSet = frames[imageIndex].Descriptors.AllocateDescriptorSet(device, DescriptorSetLayout);
+
+		DescriptorWriter writer;
+		writer.WriteImage(1, objTex.TextureImageView, TextureSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+		writer.UpdateSet(device, imageSet);
+
+		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &imageSet, 0, nullptr);
+
 		//The magic function
 		glm::mat4 modelMatrix(1.f);
 		modelMatrix = glm::translate(modelMatrix, obj->GetTransform().position);
@@ -1206,6 +1196,10 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		constant.Ka = obj->GetKa();
 		constant.Kd = obj->GetKd();
 		constant.Ks = obj->GetKs();
+		constant.vBufAddress = obj->GetMesh()->GetVertexBufferAddress();
+
+		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstant), &constant);
+		vkCmdDrawIndexed(CmdBuffer, objTex.TextureMem->GetSize(), 1, 0, 0, 0);
 
 		//upload the matrix to the GPU via push constants. Choose which layout to use based on lighting model
 		//This is bad should bind pipeline, render all obj in that pipeline, then bind the next one then render all of those
@@ -1332,7 +1326,7 @@ void Renderer::CreateSyncObjects()
 	}
 }
 
-Renderer::VmaBuffer Renderer::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flags)
+VmaBuffer Renderer::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flags)
 {
 	VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
 	bufferInfo.pNext = nullptr;
@@ -1415,15 +1409,28 @@ void Renderer::CreateUniformBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
-	UniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-	UniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-	UniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
-
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 	}
 
 	UpdateUniformBuffer();
+}
+
+void Renderer::InitDescriptors() {
+
+	//Init initial descriptor pool for each frame
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		// create a descriptor pool
+		std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 },
+		};
+
+		frames[i].Descriptors = DescriptorAllocatorGrowable{};
+		frames[i].Descriptors.InitPool(device, 1000, frame_sizes);
+	}
+
+
 }
 
 void Renderer::CreateDescriptorSetLayout()
@@ -1505,7 +1512,7 @@ void Renderer::UpdateDescriptorSets(int objTextureIndex)
 {
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = UniformBuffers[i]; //Every object is sharing a UBO that has the VP matrieces
+		bufferInfo.buffer = frames[i].UniformBuffer.buffer; //Every object is sharing a UBO that has the VP matrieces
 		bufferInfo.offset = 0;
 		bufferInfo.range = sizeof(UniformBufferObject);
 
