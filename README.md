@@ -10,7 +10,8 @@ has turned into more of a custom game engine.
 - Asset and object management 🟢
   - Texture and Mesh loading
   - Vulkan buffer updates
-- Implement ImGUI <- Currently here 
+- Functioning draw loop <- Currently here
+- Implement ImGUI 
   - Adding buttons for creating new objects
   - Fields for editing an objects mesh/texture/material
   - etc..
