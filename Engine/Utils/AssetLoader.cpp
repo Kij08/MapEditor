@@ -3,6 +3,7 @@
 //
 
 #include "AssetLoader.h"
+#include "../Renderer/Renderer.h"
 #include "../Primitives/Object.h"
 
 #define STB_IMAGE_IMPLEMENTATION

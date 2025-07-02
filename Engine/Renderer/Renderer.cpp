@@ -8,14 +8,22 @@
 #include <limits>
 #include <algorithm>
 #include <iostream>
-#include "../Primitives/Object.h"
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <cstring>
 #include <glm/gtc/matrix_transform.hpp>
 
-Renderer* loadedRenderer = nullptr;
+#define VMA_IMPLEMENTATION
+#include "../../include/vk_mem_alloc.h"
 
-Renderer& Renderer::Get() { return *loadedRenderer; }
+static Renderer* loadedRenderer;
+
+Renderer& Renderer::Get() {
+	if (loadedRenderer == nullptr) {
+		loadedRenderer = new Renderer();
+	}
+	return *loadedRenderer;
+}
 
 //Static functions
 static std::vector<char> ReadShaderFiles(const std::string& filename)
@@ -101,17 +109,13 @@ void Renderer::Terminate()
 }
 
 void Renderer::Startup() {
-	//Setup renderer singleton
-	assert(loadedRenderer == nullptr);
-	loadedRenderer = this;
 
 	glfwInit();
-
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	windowRef = glfwCreateWindow(WIDTH, HEIGHT, "Space Survival", nullptr, nullptr);
+	windowRef = glfwCreateWindow(WIDTH, HEIGHT, "Map Editor", nullptr, nullptr);
 	glfwSetWindowUserPointer(windowRef, this);
 	glfwSetFramebufferSizeCallback(windowRef, ResizeFrameBufferCallback);
 
@@ -125,7 +129,7 @@ void Renderer::Startup() {
 	CreateImageViews();
 	CreateDescriptorSetLayout();
 	CreateGraphicsPipeline();
-	CreateUnlitPipeline();
+	//CreateUnlitPipeline();
 	CreateDepthResources();
 	CreateCommandPool();
 	CreateTextureSampler();
@@ -222,7 +226,7 @@ bool Renderer::CheckValidationLayerSupport()
 		bool layerFound = false;
 
 		for (const auto& layerProperties : availableLayers) {
-			if (strcmp(layerName, layerProperties.layerName) == 0) {
+			if (std::strcmp(layerName, layerProperties.layerName) == 0) {
 				layerFound = true;
 				break;
 			}
@@ -236,6 +240,7 @@ bool Renderer::CheckValidationLayerSupport()
 	return true;
 }
 
+//Get required vulkan Instance extensions
 std::vector<const char*> Renderer::GetRequiredExtensions() {
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions;
@@ -246,6 +251,8 @@ std::vector<const char*> Renderer::GetRequiredExtensions() {
 	if (enableValidationLayers) {
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	}
+
+	extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 	return extensions;
 }
@@ -297,11 +304,11 @@ void Renderer::CreateVKInstance()
 
 	VkApplicationInfo appInfo{};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "Space Program";
+	appInfo.pApplicationName = "Map Editor";
 	appInfo.applicationVersion = VK_MAKE_API_VERSION(1, 0, 0, 0);
 	appInfo.pEngineName = "No Engine";
 	appInfo.engineVersion = VK_MAKE_API_VERSION(1, 0, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_0;
+	appInfo.apiVersion = VK_API_VERSION_1_4;
 
 	VkInstanceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -325,18 +332,6 @@ void Renderer::CreateVKInstance()
 		createInfo.pNext = nullptr;
 	}
 
-
-	/*uint32_t glfwExtensionCount = 0;
-	const char** glfwExtensions;
-
-	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-	createInfo.enabledExtensionCount = glfwExtensionCount;
-	createInfo.ppEnabledExtensionNames = glfwExtensions;*/
-
-
-	VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
-
 	if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
 		throw std::runtime_error("Could not create instance");
 	}
@@ -359,6 +354,9 @@ void Renderer::ChooseDevice()
 			physicalDevice = device;
 			break;
 		}
+		else {
+			std::cout << "Could not find a suitable GPU!" << std::endl;
+		}
 	}
 }
 
@@ -376,6 +374,7 @@ bool Renderer::GPUSuitable(VkPhysicalDevice gpu)
 	QueueFamilyIndices indices = findQueueFamilies(gpu);
 
 	//Prefer discrete gpu over integrated
+	std::cout << "Device Support: " << CheckDeviceExtensionSupport(gpu) << std::endl;
 	if (indices.isComplete() && CheckDeviceExtensionSupport(gpu)) {
 		bool swapChainAdequate = false;
 		SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(gpu);
@@ -468,14 +467,14 @@ void Renderer::CreateLogicalDevice()
 	VkPhysicalDeviceFeatures deviceFeatures{};
 	deviceFeatures.samplerAnisotropy = VK_TRUE;
 
-	VkDeviceCreateInfo createInfo{ .pNext = &dynamic_rendering_feature };
+	VkDeviceCreateInfo createInfo{  };
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();;
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 	createInfo.pEnabledFeatures = &deviceFeatures;
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(DeviceExtensions.size());
 	createInfo.ppEnabledExtensionNames = DeviceExtensions.data();
-	createInfo.enabledLayerCount = 0;
+	createInfo.pNext = &dynamic_rendering_feature;
 
 	if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
 		throw std::runtime_error("Could not create logical device");
@@ -646,8 +645,8 @@ void Renderer::RecreateSwapChain()
 
 void Renderer::CleanupSwapChain()
 {
-	vkDestroyImageView(device, DepthTexture.GetAllocation().TextureImageView, nullptr);
-	vmaDestroyImage(vmaAllocator, DepthTexture.GetAllocation().TextureImage, DepthTexture.GetAllocation().TextureMem);
+	vkDestroyImageView(device, DepthTexture.TextureImageView, nullptr);
+	vmaDestroyImage(vmaAllocator, DepthTexture.TextureImage, DepthTexture.TextureMem);
 
 	for (auto imageView : swapChainImageViews) {
 		vkDestroyImageView(device, imageView, nullptr);
@@ -668,8 +667,8 @@ void Renderer::CreateImageViews()
 
 void Renderer::CreateGraphicsPipeline()
 {
-	std::vector<char> vertShaderCode = ReadShaderFiles("Source/Shaders/vert.spv");
-	std::vector<char> fragShaderCode = ReadShaderFiles("Source/Shaders/frag.spv");
+	std::vector<char> vertShaderCode = ReadShaderFiles("../Engine/Shaders/vert.spv");
+	std::vector<char> fragShaderCode = ReadShaderFiles("../Engine/Shaders/frag.spv");
 
 	VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
 	VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
@@ -1085,7 +1084,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 		.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 		.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-		.image = DepthTexture.GetAllocation().TextureImage,
+		.image = DepthTexture.TextureImage,
 		.subresourceRange = {
 			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
 			.baseMipLevel = 0,
@@ -1125,7 +1124,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 
 	const VkRenderingAttachmentInfoKHR DepthAttachInfo {
 		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
-		.imageView = DepthTexture.GetAllocation().TextureImageView,
+		.imageView = DepthTexture.TextureImageView,
 		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
 		.resolveMode = VK_RESOLVE_MODE_NONE,
 		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -1145,7 +1144,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 	};
 
 	///Start Draw
-	vkCmdBeginRenderingKHR(CmdBuffer, &RenderInfo);
+	vkCmdBeginRendering(CmdBuffer, &RenderInfo);
 
 	//Since these are dynamic they must be set here
 	VkViewport viewport{};
@@ -1820,7 +1819,7 @@ void Renderer::CreateTextureSampler()
 void Renderer::CreateDepthResources()
 {
 	VkFormat depthFormat = FindDepthFormat();
-	DepthTexture = CreateImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+	DepthTexture = CreateImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT).GetAllocation();
 }
 
 VkFormat Renderer::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {

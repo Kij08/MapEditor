@@ -1,20 +1,27 @@
 #include "Engine/Renderer/Renderer.h"
 #include "Engine/Scene/Scene.h"
-void mainLoop(Scene* scene) {
+
+#include <iostream>
+void mainLoop() {
 
     Renderer& r = Renderer::Get();
+    r.Startup();
+
+    Scene s;
+    s.InitScene();
+
     while (!glfwWindowShouldClose(r.GetWindow())) {
 
         glfwPollEvents();
 
-        r.DrawFrame(scene->GetObjectList());
+        r.DrawFrame(s.GetObjectList());
     }
 
     vkDeviceWaitIdle(r.GetDevice());
 }
 
 int main() {
-    Scene s;
-    s.InitScene();
-    mainLoop(&s);
+    std::cout << "Hello World!" << std::endl;
+
+    mainLoop();
 }

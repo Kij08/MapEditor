@@ -5,7 +5,9 @@
 #ifndef ASSETLOADER_H
 #define ASSETLOADER_H
 
-#include "../Renderer/Renderer.h"
+#include <string>
+#include <unordered_map>
+#include <memory>
 
 struct TextureLoader {
 
@@ -16,17 +18,17 @@ struct ModelLoader {
 };
 
 class AssetManager {
-    std::unordered_map<std::string, std::shared_ptr<Texture>> LoadedTextures;
+    std::unordered_map<std::string, std::shared_ptr<class Texture>> LoadedTextures;
     std::unordered_map<std::string, std::shared_ptr<class Mesh>> LoadedMeshes;
 
     std::shared_ptr<Texture> LoadTexture(std::string texturePath);
-    std::shared_ptr<class Mesh> LoadMesh(std::string modelPath);
+    std::shared_ptr<Mesh> LoadMesh(std::string modelPath);
 
 public:
-    AssetManager();
+    AssetManager() {};
 
 
-    void LoadObject(Object* obj);
+    void LoadObject(class Object* obj);
 
 
 };

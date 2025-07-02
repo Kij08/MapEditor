@@ -7,23 +7,24 @@
 
 #include "RTypes.h"
 
-
 #include <optional>
 #include <fstream>
 #include <vector>
 #include <memory>
 #include <span>
 #include "RDescriptors.h"
-#include "../Primitives/Texture.h"
+#include "../Primitives/Object.h"
 
 class Window;
 
 
 class Renderer {
-
+protected:
+	Renderer() {};
 
 public:
-
+	Renderer(Renderer& other) = delete;
+	void operator=(const Renderer&) = delete;
 	static Renderer& Get();
 
 
@@ -80,7 +81,8 @@ private:
 
 	const std::vector<const char*> DeviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		"VK_KHR_dynamic_rendering"
+		"VK_KHR_dynamic_rendering",
+		"VK_KHR_depth_stencil_resolve"
 	};
 
 	GLFWwindow* windowRef;
@@ -243,7 +245,7 @@ public:
 	void CreateTextureSampler();
 private:
 
-	Texture DepthTexture;
+	TextureAllocation DepthTexture;
 
 	void CreateDepthResources();
 

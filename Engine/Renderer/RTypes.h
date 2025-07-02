@@ -12,7 +12,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/hash.hpp"
 
-#define VMA_IMPLEMENTATION
 #include "../../include/vk_mem_alloc.h"
 
 

@@ -22,4 +22,5 @@ add_executable(MapEditor main.cpp
         Engine/Utils/AssetLoader.h
         Engine/Renderer/RDescriptors.cpp
         Engine/Renderer/RDescriptors.h
-        Engine/Renderer/RTypes.h)
+        Engine/Renderer/RTypes.h
+        Engine/Renderer/RTypes.cpp)

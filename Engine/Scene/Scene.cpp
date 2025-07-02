@@ -6,7 +6,7 @@
 #include "../Primitives/Object.h"
 
 void Scene::InitScene() {
-    CreateObject<Object>();
+    //CreateObject<Object>();
 }
 
 template<class TObject>
@@ -15,8 +15,8 @@ TObject* Scene::CreateObject() {
 
     TObject* obj = new TObject();
     //Setup code for all objects
-    //obj->SetLevelReference(this);
-    //objects.insert(obj);
-    //sceneAssetManager.LoadObject(obj);
+    obj->SetLevelReference(this);
+    //objects.push_back(std::make_shared<Object>(obj));
+    sceneAssetManager.LoadObject(obj);
     return obj;
 }
