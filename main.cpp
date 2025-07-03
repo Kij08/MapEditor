@@ -21,7 +21,6 @@ void mainLoop() {
 }
 
 int main() {
-    std::cout << "Hello World!" << std::endl;
 
     mainLoop();
 }

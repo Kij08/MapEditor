@@ -6,17 +6,17 @@
 #include "../Primitives/Object.h"
 
 void Scene::InitScene() {
-    //CreateObject<Object>();
+    CreateObject<Object>();
 }
 
 template<class TObject>
-TObject* Scene::CreateObject() {
+std::shared_ptr<TObject> Scene::CreateObject() {
     static_assert(std::is_base_of<Object, TObject>::value, "Not an Object");
 
-    TObject* obj = new TObject();
     //Setup code for all objects
+    std::shared_ptr<TObject> obj = std::make_shared<Object>();
     obj->SetLevelReference(this);
-    //objects.push_back(std::make_shared<Object>(obj));
-    sceneAssetManager.LoadObject(obj);
+    objects.push_back(obj);
+    sceneAssetManager.LoadObject(obj.get());
     return obj;
 }

@@ -362,14 +362,19 @@ void Renderer::ChooseDevice()
 
 bool Renderer::GPUSuitable(VkPhysicalDevice gpu)
 {
-	VkPhysicalDeviceProperties deviceProperties;
-	VkPhysicalDeviceFeatures deviceFeatures;
-	vkGetPhysicalDeviceProperties(gpu, &deviceProperties);
-	vkGetPhysicalDeviceFeatures(gpu, &deviceFeatures);
+	VkPhysicalDeviceBufferDeviceAddressFeatures addressFeatures { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+	VkPhysicalDeviceProperties2 deviceProperties = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+	VkPhysicalDeviceFeatures2 deviceFeatures = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &addressFeatures};
+	vkGetPhysicalDeviceProperties2(gpu, &deviceProperties);
+	vkGetPhysicalDeviceFeatures2(gpu, &deviceFeatures);
 
-	if (deviceFeatures.samplerAnisotropy != true) {
+	if (deviceFeatures.features.samplerAnisotropy != true) {
 		return false;
 	}
+	if (addressFeatures.bufferDeviceAddress != true) { //
+		return false;
+	}
+
 
 	QueueFamilyIndices indices = findQueueFamilies(gpu);
 
@@ -380,10 +385,10 @@ bool Renderer::GPUSuitable(VkPhysicalDevice gpu)
 		SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(gpu);
 		swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
 
-		if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+		if (deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
 			return swapChainAdequate; //will be true if swapchain is supported
 		}
-		else if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+		else if (deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
 			return swapChainAdequate;
 		}
 		else {
@@ -440,8 +445,7 @@ Renderer::QueueFamilyIndices Renderer::findQueueFamilies(VkPhysicalDevice device
 	return indices;
 }
 
-void Renderer::CreateLogicalDevice()
-{
+void Renderer::CreateLogicalDevice() {
 	QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -459,22 +463,32 @@ void Renderer::CreateLogicalDevice()
 		queueCreateInfos.push_back(queueCreateInfo);
 	}
 
-	constexpr VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature {
+	VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
-		.dynamicRendering = VK_TRUE,
+		.dynamicRendering = VK_TRUE
 	};
 
-	VkPhysicalDeviceFeatures deviceFeatures{};
-	deviceFeatures.samplerAnisotropy = VK_TRUE;
+	VkPhysicalDeviceBufferDeviceAddressFeatures bufferFeatures {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+		.pNext = &dynamic_rendering_feature,
+		.bufferDeviceAddress = VK_TRUE
+	};
+
+	VkPhysicalDeviceFeatures2 deviceFeatures {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.pNext = &bufferFeatures,
+		.features{ .samplerAnisotropy = VK_TRUE }
+	};
 
 	VkDeviceCreateInfo createInfo{  };
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();;
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-	createInfo.pEnabledFeatures = &deviceFeatures;
+	//createInfo.pEnabledFeatures = ;
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(DeviceExtensions.size());
 	createInfo.ppEnabledExtensionNames = DeviceExtensions.data();
-	createInfo.pNext = &dynamic_rendering_feature;
+	createInfo.pNext = &deviceFeatures;
+
 
 	if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
 		throw std::runtime_error("Could not create logical device");
@@ -490,7 +504,7 @@ void Renderer::CreateVulkanAllocator() {
 	vulkanFunctions.vkGetDeviceProcAddr = &vkGetDeviceProcAddr;
 
 	VmaAllocatorCreateInfo allocatorCreateInfo = {};
-	allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+	allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT | VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 	allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_4;
 	allocatorCreateInfo.physicalDevice = physicalDevice;
 	allocatorCreateInfo.device = device;
@@ -687,12 +701,12 @@ void Renderer::CreateGraphicsPipeline()
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
-	/*VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-	auto attributeDescriptions = Vertex::getAttributeDescriptions();
+	//VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
+	//auto attributeDescriptions = Vertex::getAttributeDescriptions();
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	/*vertexInputInfo.vertexBindingDescriptionCount = 1;
 	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
 	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());;
 	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();*/
@@ -820,7 +834,7 @@ void Renderer::CreateGraphicsPipeline()
 	pipelineInfo.pNext = &PipelineRenderingCreateInfo,
 	pipelineInfo.stageCount = 2;
 	pipelineInfo.pStages = shaderStages;
-	pipelineInfo.pVertexInputState = VK_NULL_HANDLE;
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;

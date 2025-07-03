@@ -9,8 +9,8 @@ Object::Object()
 {
     Transform t = { .position = glm::vec3(0, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(1, 1, 1) };
     SetTransform(t);
-    PATH_TO_MODEL = "/DefaultContent/Meshes/CH_Player_Ship.obj";
-    PATH_TO_TEXTURE = "/DefaultContent/Textures/SpaceShip_CLR.png";
+    PATH_TO_MODEL = "../DefaultContent/Meshes/CH_Player_Ship.obj";
+    PATH_TO_TEXTURE = "../DefaultContent/Textures/SpaceShip_CLR.png";
 
     Ka = 0;
     Kd = 0;

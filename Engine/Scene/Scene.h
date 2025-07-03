@@ -28,7 +28,7 @@ public:
     void InitScene();
 
     template<class TObject>
-    TObject* CreateObject();
+    std::shared_ptr<TObject> CreateObject();
 
     const std::vector<std::shared_ptr<Object>>& GetObjectList() { return objects; }
 };

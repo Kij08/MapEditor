@@ -32,7 +32,7 @@ std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath)
 		throw std::runtime_error("Could not load texture image!");
 	}
 
-	VmaBuffer stagingBuffer = Renderer::Get().CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+	VmaBuffer stagingBuffer = Renderer::Get().CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
 	//Copy pixel mem to buffer then free the raw data
 	memcpy(stagingBuffer.info.pMappedData, pixels, imageSize);
