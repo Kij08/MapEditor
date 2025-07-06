@@ -15,6 +15,7 @@ void mainLoop() {
         glfwPollEvents();
 
         r.DrawFrame(s.GetObjectList());
+
     }
 
     vkDeviceWaitIdle(r.GetDevice());

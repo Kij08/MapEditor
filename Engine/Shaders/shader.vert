@@ -3,12 +3,14 @@
 
 struct Vertex {
     vec3 pos;
-    vec3 colour;
+    float xUV;
     vec3 normal;
-    vec2 uv;
+    float yUV;
+    vec3 colour;
+
 };
 
-layout(buffer_reference, std430) readonly buffer VertexBuffer{
+layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer VertexBuffer{
     Vertex vertices[];
 };
 
@@ -40,8 +42,9 @@ void main() {
     Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
 
     gl_Position = ubo.proj * ubo.view * PushConstants.modelMatrix * vec4(v.pos, 1.0);
+
     fragColour = v.colour;
-    fragTexCoord = v.uv;
+    fragTexCoord = vec2(v.xUV, v.yUV);
     surfaceNormal = v.normal;
     Ka = PushConstants.Ka;
     Kd = PushConstants.Kd;

@@ -195,7 +195,7 @@ void DescriptorWriter::WriteImage(int binding, VkImageView image, VkSampler samp
     VkWriteDescriptorSet write = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
 
     write.dstBinding = binding;
-    write.dstSet = VK_NULL_HANDLE; //left empty for now until we need to write it
+    write.dstSet = VK_NULL_HANDLE; //left empty until writedescriptors is called
     write.descriptorCount = 1;
     write.descriptorType = type;
     write.pImageInfo = &info;
@@ -209,11 +209,12 @@ void DescriptorWriter::WriteBuffer(int binding, VkBuffer buffer, size_t size, si
     VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
 
     write.dstBinding = binding;
-    write.dstSet = VK_NULL_HANDLE; //left empty for now until we need to write it
+    write.dstSet = VK_NULL_HANDLE; //left empty until writedescriptors is called
     write.descriptorCount = 1;
     write.descriptorType = type;
     write.pBufferInfo = &info;
 
+    writes.push_back(write);
 }
 
 void DescriptorWriter::Clear() {

@@ -70,9 +70,7 @@ void Renderer::Terminate()
 
 	vkDestroySampler(device, TextureSampler, nullptr);
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vkDestroyImageView(device, TextureImageViews[i], nullptr);
-		vkDestroyImage(device, TextureImages[i], nullptr);
-		vkFreeMemory(device, TextureImageMemories[i], nullptr);
+
 	}
 
 	vkDestroyDescriptorPool(device, DescriptorPool, nullptr);
@@ -128,6 +126,7 @@ void Renderer::Startup() {
 	CreateSwapChain();
 	CreateImageViews();
 	CreateDescriptorSetLayout();
+	InitDescriptors();
 	CreateGraphicsPipeline();
 	//CreateUnlitPipeline();
 	CreateDepthResources();
@@ -162,9 +161,7 @@ void Renderer::DrawFrame(const std::vector<std::shared_ptr<Object>>& objects)
 
 	vkResetCommandBuffer(CommandBuffers[currentFrame], 0);
 
-	RecordCommandBuffer(CommandBuffers[currentFrame], imageIndex, objects);
-
-	//UpdateUniformBuffer(currentFrame, {0,0,0}, {0,0,0}, {0,0,0});
+	RecordCommandBuffer(CommandBuffers[currentFrame], imageIndex, currentFrame, objects);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -308,7 +305,7 @@ void Renderer::CreateVKInstance()
 	appInfo.applicationVersion = VK_MAKE_API_VERSION(1, 0, 0, 0);
 	appInfo.pEngineName = "No Engine";
 	appInfo.engineVersion = VK_MAKE_API_VERSION(1, 0, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_4;
+	appInfo.apiVersion = VK_API_VERSION_1_3;
 
 	VkInstanceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -463,14 +460,21 @@ void Renderer::CreateLogicalDevice() {
 		queueCreateInfos.push_back(queueCreateInfo);
 	}
 
-	VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature {
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+	//Enable Vulkan core features
+	VkPhysicalDeviceSynchronization2Features sync2Features = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
+		.synchronization2 = VK_TRUE
+	};
+
+	VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+		.pNext = &sync2Features,
 		.dynamicRendering = VK_TRUE
 	};
 
 	VkPhysicalDeviceBufferDeviceAddressFeatures bufferFeatures {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
-		.pNext = &dynamic_rendering_feature,
+		.pNext = &dynamicRenderingFeatures,
 		.bufferDeviceAddress = VK_TRUE
 	};
 
@@ -484,7 +488,6 @@ void Renderer::CreateLogicalDevice() {
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();;
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-	//createInfo.pEnabledFeatures = ;
 	createInfo.enabledExtensionCount = static_cast<uint32_t>(DeviceExtensions.size());
 	createInfo.ppEnabledExtensionNames = DeviceExtensions.data();
 	createInfo.pNext = &deviceFeatures;
@@ -559,10 +562,10 @@ VkPresentModeKHR Renderer::ChooseSwapPresentMode(const std::vector<VkPresentMode
 {
 	for (const auto& availablePresentMode : availablePresentModes) {
 		if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-			return availablePresentMode;
+			//return availablePresentMode; //Uncomment to uncap FPS
 		}
 	}
-	return VK_PRESENT_MODE_FIFO_KHR;
+	return VK_PRESENT_MODE_FIFO_KHR; // This will force VSync
 }
 
 VkExtent2D Renderer::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
@@ -826,7 +829,7 @@ void Renderer::CreateGraphicsPipeline()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
 		.colorAttachmentCount = 1,
 		.pColorAttachmentFormats = &swapChainImageFormat,
-		.depthAttachmentFormat = FindDepthFormat()
+		.depthAttachmentFormat = FindDepthFormat(),
 	};
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -1055,7 +1058,7 @@ void Renderer::CreateCommandBuffers()
 	}
 }
 
-void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, const std::vector<std::shared_ptr<Object>>& objects)
+void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects)
 {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1100,7 +1103,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
 		.image = DepthTexture.TextureImage,
 		.subresourceRange = {
-			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
 			.baseMipLevel = 0,
 			.levelCount = 1,
 			.baseArrayLayer = 0,
@@ -1157,6 +1160,8 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		.pDepthAttachment = &DepthAttachInfo
 	};
 
+	UpdateUniformBuffer(CmdBuffer, frameIndex); //Update uniform buffer for this frame
+
 	///Start Draw
 	vkCmdBeginRendering(CmdBuffer, &RenderInfo);
 
@@ -1182,19 +1187,28 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 	//Make vertex buffer big and put all object verts in there, if it ever gets too small double its size using the same createVertexBuffer() workflow
 	//Need to store the offsets for each object, be able to remove and add objects to vert and index array
 	//UpdateUniformBuffer(currentFrame, obj->GetTransform().position, obj->GetTransform().rotation, obj->GetTransform().scale);
+	frames[frameIndex].Descriptors.ClearDescriptors(device);
 
 	for (auto const& obj : objects) {
+
 		TextureAllocation objTex = obj.get()->GetTexture()->GetAllocation();
 		//Dynamically allocate descriptors for obj textures. Use global set layout
-		VkDescriptorSet imageSet = frames[imageIndex].Descriptors.AllocateDescriptorSet(device, DescriptorSetLayout);
+		VkDescriptorSet imageSet = frames[frameIndex].Descriptors.AllocateDescriptorSet(device, DescriptorSetLayout);
 
 		DescriptorWriter writer;
+		writer.WriteBuffer(0, frames[frameIndex].UniformBuffer.buffer, sizeof(UniformBufferObject), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER); //TODO: Cache UBO. Don't need to update it every frame
 		writer.WriteImage(1, objTex.TextureImageView, TextureSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 		writer.UpdateSet(device, imageSet);
 
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &imageSet, 0, nullptr);
 
+		vkCmdBindIndexBuffer(CmdBuffer, obj.get()->GetMesh()->GetIndexBuffer().buffer, 0, VK_INDEX_TYPE_UINT32);
+
+		static float xRot = 30;
+		Transform t{ .position = glm::vec3(0, 0, 0), .rotation = glm::vec3(xRot, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5)};
+		xRot += 0.1;
+		obj->SetTransform(t);
 		//The magic function
 		glm::mat4 modelMatrix(1.f);
 		modelMatrix = glm::translate(modelMatrix, obj->GetTransform().position);
@@ -1206,77 +1220,14 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		//Set up push constants. Model matrix and blinn-hong shading lighting constants
 		MeshPushConstant constant;
 		constant.modelMatrix = modelMatrix;
-		constant.Ka = obj->GetKa();
-		constant.Kd = obj->GetKd();
-		constant.Ks = obj->GetKs();
 		constant.vBufAddress = obj->GetMesh()->GetVertexBufferAddress();
-
-		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstant), &constant);
-		vkCmdDrawIndexed(CmdBuffer, objTex.TextureMem->GetSize(), 1, 0, 0, 0);
-
-		//upload the matrix to the GPU via push constants. Choose which layout to use based on lighting model
-		//This is bad should bind pipeline, render all obj in that pipeline, then bind the next one then render all of those
-		/*if (obj->bIsLit) {
-			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
-			vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstant), &constant);
-			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSets[currentFrame][obj->GetDescriptorIndex()], 0, nullptr);
-		}
-		else {
-			vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UnlitPipeline);
-			vkCmdPushConstants(CmdBuffer, UnlitPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstant), &constant);
-			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UnlitPipelineLayout, 0, 1, &DescriptorSets[currentFrame][obj->GetDescriptorIndex()], 0, nullptr);
-		}*/
-
-		//vkCmdDrawIndexed(CmdBuffer, static_cast<uint32_t>(obj->GetIndexSizeInBuffer()), 1, obj->GetIndexOffset(), 0, 0);
-	}
-
-
-
-	/*for (Object* obj : litObjects) {
-		//The magic function
-		glm::mat4 modelMatrix(1.f);
-		modelMatrix = glm::translate(modelMatrix, obj->GetTransform().position);
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(obj->GetTransform().rotation.x), glm::vec3(1.f, 0, 0));
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(obj->GetTransform().rotation.y), glm::vec3(0, 1.f, 0));
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(obj->GetTransform().rotation.z), glm::vec3(0, 0, 1.f));
-		modelMatrix = glm::scale(modelMatrix, obj->GetTransform().scale);
-
-		MeshPushConstant constant;
-		constant.modelMatrix = modelMatrix;
 		constant.Ka = obj->GetKa();
 		constant.Kd = obj->GetKd();
 		constant.Ks = obj->GetKs();
 
-		//upload the matrix to the GPU via push constants
 		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstant), &constant);
-
-		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSets[currentFrame][obj->GetDescriptorIndex()], 0, nullptr);
-		vkCmdDrawIndexed(CmdBuffer, static_cast<uint32_t>(obj->GetIndexSizeInBuffer()), 1, obj->GetIndexOffset(), 0, 0);
+		vkCmdDrawIndexed(CmdBuffer, obj.get()->GetMesh()->primitives[0].count, 1, 0, 0, 0);
 	}
-
-	vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UnlitPipeline);
-
-	for (Object* obj : unlitObjects) {
-		//The magic function
-		glm::mat4 modelMatrix(1.f);
-		modelMatrix = glm::translate(modelMatrix, obj->GetTransform().position);
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(obj->GetTransform().rotation.x), glm::vec3(1.f, 0, 0));
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(obj->GetTransform().rotation.y), glm::vec3(0, 1.f, 0));
-		modelMatrix = glm::rotate(modelMatrix, glm::radians(obj->GetTransform().rotation.z), glm::vec3(0, 0, 1.f));
-		modelMatrix = glm::scale(modelMatrix, obj->GetTransform().scale);
-
-		MeshPushConstant constant;
-		constant.modelMatrix = modelMatrix;
-		constant.Ka = 0;
-		constant.Kd = 0;
-		constant.Ks = 0;
-
-		//upload the matrix to the GPU via push constants
-		vkCmdPushConstants(CmdBuffer, UnlitPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstant), &constant);
-
-		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, UnlitPipelineLayout, 0, 1, &DescriptorSets[currentFrame][obj->GetDescriptorIndex()], 0, nullptr);
-		vkCmdDrawIndexed(CmdBuffer, static_cast<uint32_t>(obj->GetIndexSizeInBuffer()), 1, obj->GetIndexOffset(), 0, 0);
-	}*/
 
 	vkCmdEndRendering(CmdBuffer);
 
@@ -1423,10 +1374,9 @@ void Renderer::CreateUniformBuffer()
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+		frames[i].UniformBuffer = CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 	}
 
-	UpdateUniformBuffer();
 }
 
 void Renderer::InitDescriptors() {
@@ -1442,7 +1392,6 @@ void Renderer::InitDescriptors() {
 		frames[i].Descriptors = DescriptorAllocatorGrowable{};
 		frames[i].Descriptors.InitPool(device, 1000, frame_sizes);
 	}
-
 
 }
 
@@ -1521,135 +1470,82 @@ void Renderer::CreateDescriptorSets() //Each object probably needs a descriptor 
 	}
 }
 
-void Renderer::UpdateDescriptorSets(int objTextureIndex)
+void Renderer::UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex)
 {
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = frames[i].UniformBuffer.buffer; //Every object is sharing a UBO that has the VP matrieces
-		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(UniformBufferObject);
-
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = TextureImageViews[objTextureIndex];
-		imageInfo.sampler = TextureSampler;
-
-		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-
-		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[0].dstSet = DescriptorSets[i][objTextureIndex];
-		descriptorWrites[0].dstBinding = 0;
-		descriptorWrites[0].dstArrayElement = 0;
-		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[0].descriptorCount = 1;
-		descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[1].dstSet = DescriptorSets[i][objTextureIndex];
-		descriptorWrites[1].dstBinding = 1;
-		descriptorWrites[1].dstArrayElement = 0;
-		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrites[1].descriptorCount = 1;
-		descriptorWrites[1].pImageInfo = &imageInfo;
-
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-	}
-}
-
-void Renderer::UpdateUniformBuffer()
-{
-	//static auto startTime = std::chrono::high_resolution_clock::now();
-
-	//auto currentTime = std::chrono::high_resolution_clock::now();
-	//float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
 	UniformBufferObject ubo{};
-	//ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	//ubo.model = glm::translate(ubo.model, pos);
 
-	ubo.view = glm::lookAt(glm::vec3(2000.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.view = glm::lookAt(glm::vec3(500.0f, 30.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-	ubo.proj = glm::perspective(glm::radians(75.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10000.f);
+	ubo.proj = glm::perspective(glm::radians(70.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 1000.f);
 
 	//Y axis transformation since glm is for OpenGL
 	ubo.proj[1][1] *= -1;
 
-	/*VkMemoryPropertyFlags memPropFlags;
-	vmaGetAllocationMemoryProperties(vmaAllocator, alloc, &memPropFlags);
+	//Test for what kind of UBO Vma made. If its in BAR or RAM, or if its on the GPU.
+	VkMemoryPropertyFlags memPropFlags;
+	vmaGetAllocationMemoryProperties(vmaAllocator, frames[frameIndex].UniformBuffer.allocation, &memPropFlags);
 
 	if(memPropFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
 	    // The Allocation ended up in a mappable memory.
-	    vmaCopyMemoryToAllocation(vmaAllocator, myData, alloc, 0, myDataSize);
+	    vmaCopyMemoryToAllocation(vmaAllocator, &ubo, frames[frameIndex].UniformBuffer.allocation, 0, sizeof(UniformBufferObject));
 
 	    VkBufferMemoryBarrier bufMemBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
 	    bufMemBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
 	    bufMemBarrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
 	    bufMemBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	    bufMemBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	    bufMemBarrier.buffer = buf;
+	    bufMemBarrier.buffer = frames[frameIndex].UniformBuffer.buffer;
 	    bufMemBarrier.offset = 0;
 	    bufMemBarrier.size = VK_WHOLE_SIZE;
 
 	    // It's important to insert a buffer memory barrier here to ensure writing to the buffer has finished.
-	    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+	    vkCmdPipelineBarrier(CmdBuf, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
 	        0, 0, nullptr, 1, &bufMemBarrier, 0, nullptr);
 	}
 	else {
 	    // Allocation ended up in a non-mappable memory - a transfer using a staging buffer is required.
-	    VkBufferCreateInfo stagingBufCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-	    stagingBufCreateInfo.size = 65536;
-	    stagingBufCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-	    VmaAllocationCreateInfo stagingAllocCreateInfo = {};
-	    stagingAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-	    stagingAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
-	        VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-	    VkBuffer stagingBuf;
-	    VmaAllocation stagingAlloc;
-	    VmaAllocationInfo stagingAllocInfo;
-	    result = vmaCreateBuffer(allocator, &stagingBufCreateInfo, &stagingAllocCreateInfo,
-	        &stagingBuf, &stagingAlloc, &stagingAllocInfo);
-	    // Check result...
+		VmaBuffer stagingBuffer = CreateBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+			VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
 	    // Calling vmaCopyMemoryToAllocation() does vmaMapMemory(), memcpy(), vmaUnmapMemory(), and vmaFlushAllocation().
-	    result = vmaCopyMemoryToAllocation(allocator, myData, stagingAlloc, 0, myDataSize);
-	    // Check result...
+	    vmaCopyMemoryToAllocation(vmaAllocator, &ubo, stagingBuffer.allocation, 0, sizeof(UniformBufferObject));
+
 
 	    VkBufferMemoryBarrier bufMemBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
 	    bufMemBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
 	    bufMemBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 	    bufMemBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	    bufMemBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	    bufMemBarrier.buffer = stagingBuf;
+	    bufMemBarrier.buffer = stagingBuffer.buffer;
 	    bufMemBarrier.offset = 0;
 	    bufMemBarrier.size = VK_WHOLE_SIZE;
 
 	    // Insert a buffer memory barrier to make sure writing to the staging buffer has finished.
-	    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+	    vkCmdPipelineBarrier(CmdBuf, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
 	        0, 0, nullptr, 1, &bufMemBarrier, 0, nullptr);
 
 	    VkBufferCopy bufCopy = {
 	        0, // srcOffset
 	        0, // dstOffset,
-	        myDataSize, // size
+	        sizeof(UniformBufferObject), // size
 	    };
 
-	    vkCmdCopyBuffer(cmdBuf, stagingBuf, buf, 1, &bufCopy);
+	    vkCmdCopyBuffer(CmdBuf, stagingBuffer.buffer, frames[frameIndex].UniformBuffer.buffer, 1, &bufCopy);
 
 	    VkBufferMemoryBarrier bufMemBarrier2 = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
 	    bufMemBarrier2.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	    bufMemBarrier2.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT; // We created a uniform buffer
 	    bufMemBarrier2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	    bufMemBarrier2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	    bufMemBarrier2.buffer = buf;
+	    bufMemBarrier2.buffer = frames[frameIndex].UniformBuffer.buffer;
 	    bufMemBarrier2.offset = 0;
 	    bufMemBarrier2.size = VK_WHOLE_SIZE;
 
 	    // Make sure copying from staging buffer to the actual buffer has finished by inserting a buffer memory barrier.
-	    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+	    vkCmdPipelineBarrier(CmdBuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
 	        0, 0, nullptr, 1, &bufMemBarrier2, 0, nullptr);
-	}*/
+	}
 
 }
 
@@ -1690,11 +1586,6 @@ Texture Renderer::CreateImage(uint32_t width, uint32_t height, VkFormat format, 
 
 	Texture Tex(TexAlloc);
 	return Tex;
-}
-
-void Renderer::CreateTextureImageView(int objTexIndex)
-{
-	TextureImageViews.push_back(CreateImageView(TextureImages[objTexIndex], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT));
 }
 
 VkImageView Renderer::CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
@@ -1875,7 +1766,7 @@ MeshBuffers Renderer::UploadModel(std::span<Vertex> vertices, std::span<uint32_t
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
 
-	VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = meshBuffer.vertexBuffer.buffer };
+	VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = meshBuffer.vertexBuffer.buffer };
 	meshBuffer.vertexBufferAddress = vkGetBufferDeviceAddress(device, &deviceAddressInfo);
 
 	meshBuffer.indexBuffer = CreateBuffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -1886,6 +1777,9 @@ MeshBuffers Renderer::UploadModel(std::span<Vertex> vertices, std::span<uint32_t
 	VmaBuffer stagingBuffer = CreateBuffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
 	VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
+
+	vmaCopyMemoryToAllocation(vmaAllocator, vertices.data(), stagingBuffer.allocation, 0, vertexBufferSize);
+	vmaCopyMemoryToAllocation(vmaAllocator, indices.data(), stagingBuffer.allocation, vertexBufferSize, indexBufferSize);
 
 	VkBufferCopy vertexCopy{ 0 };
 	vertexCopy.dstOffset = 0;

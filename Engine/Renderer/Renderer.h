@@ -169,7 +169,7 @@ private:
 	//Command Buffer
 	std::vector<VkCommandBuffer> CommandBuffers; //TODO: Move to frame data struct
 	void CreateCommandBuffers();
-	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, const std::vector<std::shared_ptr<Object>>& objects);
+	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects);
 
 	//Starts vulkan GPU commands and returns the command buffer
 	VkCommandBuffer BeginSingleTimeCommands();
@@ -225,12 +225,8 @@ private:
 		float Ks;
 	};
 
-	void UpdateUniformBuffer();
+	void UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex);
 
-	//Texture Images TODO: All this image stuff can go in the texture class
-	std::vector<VkImage> TextureImages;
-	std::vector<VkDeviceMemory> TextureImageMemories;
-	std::vector<VkImageView> TextureImageViews;
 	VkSampler TextureSampler;
 
 public:

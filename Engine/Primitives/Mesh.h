@@ -8,14 +8,16 @@
 #include <vector>
 #include "../Renderer/RTypes.h"
 
-struct Vertex {
+//Struct interleaved for allignment purposes. vec3 + float is 16, then again another 16, then vec4 is another 16. This results in 48 bytes and no padding
+struct alignas(16) Vertex {
     glm::vec3 pos;
-    glm::vec3 colour;
+    float xUV;
     glm::vec3 normal;
-    glm::vec2 uv;
+    float yUV;
+    glm::vec4 colour;
 
     bool operator==(const Vertex& other) const {
-        return pos == other.pos && colour == other.colour && uv == other.uv;
+        return pos == other.pos && colour == other.colour && xUV == other.xUV && yUV == other.yUV;
     }
 };
 
@@ -25,7 +27,7 @@ namespace std {
         size_t operator()(Vertex const& vertex) const {
             return ((hash<glm::vec3>()(vertex.pos) ^
                 (hash<glm::vec3>()(vertex.colour) << 1)) >> 1) ^
-                (hash<glm::vec2>()(vertex.uv) << 1);
+                (hash<glm::vec2>()(glm::vec2(vertex.xUV, vertex.yUV)) << 1);
         }
     };
 }
@@ -49,12 +51,15 @@ public:
     }
 
     const VkDeviceAddress& GetVertexBufferAddress() { return buffers.vertexBufferAddress; }
+    const VmaBuffer& GetIndexBuffer() { return buffers.indexBuffer; }
+
+    std::vector<MeshPrimitives> primitives;
+
 private:
 
     MeshBuffers buffers;
 
     //Vector holding all mesh primitives, Mesh will have multiple if it needs more than one material for example
-    std::vector<MeshPrimitives> primitives;
 
 
 };

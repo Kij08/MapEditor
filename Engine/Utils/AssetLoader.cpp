@@ -69,7 +69,7 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 	std::vector<tinyobj::material_t> materials;
 	std::string err;
 
-	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err,modelPath.c_str())) {
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err,modelPath.c_str(), 0, true)) {
 		std::cout << "Could not load model";
 		throw std::runtime_error(err);
 	}
@@ -88,10 +88,9 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 			};
 
 			//Array of floats so we need an offset of 2. Flip UV Y for vulkan
-			vertex.uv = {
-				attrib.texcoords[2 * index.texcoord_index + 0],
-				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-			};
+			vertex.xUV = attrib.texcoords[2 * index.texcoord_index + 0];
+			vertex.yUV = 1.0f - attrib.texcoords[2 * index.texcoord_index + 1];
+
 
 			vertex.normal = {
 				attrib.normals[3 * index.normal_index + 0],
@@ -99,10 +98,10 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 				attrib.normals[3 * index.normal_index + 2]
 			};
 
-			vertex.colour = { 1.0f, 1.0f, 1.0f };
+			vertex.colour = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 			//If vertex isnt in uniquevertices set its index to its index in verticies and add it. If its already in just add its index to indicies.
-			if (uniqueVertices.count(vertex) == 0) {
+			if (!uniqueVertices.contains(vertex)) {
 				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
 
 				vertices.push_back(vertex);
@@ -112,8 +111,12 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 		}
 	}
 
+	std::cout << vertices.size() << std::endl;
+	std::cout << indices.size() << std::endl;
+
 	//Upload mesh to GPU
 	Mesh mesh(Renderer::Get().UploadModel(vertices, indices));
+	mesh.primitives.push_back(MeshPrimitives{ .startIndex = 0, .count = static_cast<uint32_t>(indices.size())});
 	return std::make_shared<Mesh>(mesh);
 }
 
