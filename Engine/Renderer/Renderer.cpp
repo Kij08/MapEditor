@@ -16,6 +16,11 @@
 #define VMA_IMPLEMENTATION
 #include "../../include/vk_mem_alloc.h"
 
+#include "../../include/imgui/imgui_impl_glfw.h"
+#include "../../include/imgui/imgui_impl_vulkan.h"
+
+#include "../Scene/Scene.h"
+
 static Renderer* loadedRenderer;
 
 Renderer& Renderer::Get() {
@@ -66,6 +71,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
 void Renderer::Terminate()
 {
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
 	CleanupSwapChain();
 
 	vkDestroySampler(device, TextureSampler, nullptr);
@@ -111,15 +120,25 @@ void Renderer::Startup() {
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	//glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	windowRef = glfwCreateWindow(WIDTH, HEIGHT, "Map Editor", nullptr, nullptr);
 	glfwSetWindowUserPointer(windowRef, this);
 	glfwSetFramebufferSizeCallback(windowRef, ResizeFrameBufferCallback);
 
+	InputManager::InitInput(windowRef);
+
 	CreateVKInstance();
 	SetupDebugMessenger();
 	CreateSurface();
+
+	//Enable ImGUI
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	ImGui::StyleColorsDark();
+
 	ChooseDevice();
 	CreateLogicalDevice();
 	CreateVulkanAllocator();
@@ -128,8 +147,25 @@ void Renderer::Startup() {
 	CreateDescriptorSetLayout();
 	InitDescriptors();
 	CreateGraphicsPipeline();
-	//CreateUnlitPipeline();
 	CreateDepthResources();
+
+	ImGui_ImplGlfw_InitForVulkan(GetWindow(), true);
+	ImGui_ImplVulkan_InitInfo init_info = {};
+	init_info.ApiVersion = VK_API_VERSION_1_4;
+	init_info.Instance = instance;
+	init_info.PhysicalDevice = physicalDevice;
+	init_info.Device = device;
+	init_info.QueueFamily = swapChainSupportValues.queueFamily;
+	init_info.Queue = swapChainSupportValues.queue;
+	init_info.DescriptorPoolSize = 10;
+	init_info.UseDynamicRendering = true;
+	init_info.PipelineRenderingCreateInfo = swapChainSupportValues.createInfo;
+	init_info.MinImageCount = swapChainSupportValues.imageCount;
+	init_info.ImageCount = swapChainSupportValues.imageCount;
+	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	ImGui_ImplVulkan_Init(&init_info);
+
+	//CreateUnlitPipeline();
 	CreateCommandPool();
 	CreateTextureSampler();
 	CreateUniformBuffer();
@@ -141,7 +177,7 @@ void Renderer::Startup() {
 
 
 //Draw call
-void Renderer::DrawFrame(const std::vector<std::shared_ptr<Object>>& objects)
+void Renderer::DrawFrame(const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData)
 {
 	//Wait for previous frame to finish
 	vkWaitForFences(device, 1, &InFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -161,7 +197,7 @@ void Renderer::DrawFrame(const std::vector<std::shared_ptr<Object>>& objects)
 
 	vkResetCommandBuffer(CommandBuffers[currentFrame], 0);
 
-	RecordCommandBuffer(CommandBuffers[currentFrame], imageIndex, currentFrame, objects);
+	RecordCommandBuffer(CommandBuffers[currentFrame], imageIndex, currentFrame, objects, drawData);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -305,7 +341,7 @@ void Renderer::CreateVKInstance()
 	appInfo.applicationVersion = VK_MAKE_API_VERSION(1, 0, 0, 0);
 	appInfo.pEngineName = "No Engine";
 	appInfo.engineVersion = VK_MAKE_API_VERSION(1, 0, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_3;
+	appInfo.apiVersion = VK_API_VERSION_1_4;
 
 	VkInstanceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -499,6 +535,9 @@ void Renderer::CreateLogicalDevice() {
 
 	vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
 	vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+
+	swapChainSupportValues.queueFamily = indices.graphicsFamily.value();
+	swapChainSupportValues.queue = graphicsQueue;
 }
 
 void Renderer::CreateVulkanAllocator() {
@@ -597,16 +636,16 @@ void Renderer::CreateSwapChain()
 	VkPresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport.presentModes);
 	VkExtent2D extent = ChooseSwapExtent(swapChainSupport.capabilities);
 
-	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+	swapChainSupportValues.imageCount = swapChainSupport.capabilities.minImageCount + 1;
 
-	if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
-		imageCount = swapChainSupport.capabilities.maxImageCount;
+	if (swapChainSupport.capabilities.maxImageCount > 0 && swapChainSupportValues.imageCount > swapChainSupport.capabilities.maxImageCount) {
+		swapChainSupportValues.imageCount = swapChainSupport.capabilities.maxImageCount;
 	}
 
 	VkSwapchainCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	createInfo.surface = surface;
-	createInfo.minImageCount = imageCount;
+	createInfo.minImageCount = swapChainSupportValues.imageCount;
 	createInfo.imageFormat = surfaceFormat.format;
 	createInfo.imageColorSpace = surfaceFormat.colorSpace;
 	createInfo.imageExtent = extent;
@@ -635,9 +674,9 @@ void Renderer::CreateSwapChain()
 		throw std::runtime_error("Could not create swap chain!");
 	}
 
-	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
-	swapChainImages.resize(imageCount);
-	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+	vkGetSwapchainImagesKHR(device, swapChain, &swapChainSupportValues.imageCount, nullptr);
+	swapChainImages.resize(swapChainSupportValues.imageCount);
+	vkGetSwapchainImagesKHR(device, swapChain, &swapChainSupportValues.imageCount, swapChainImages.data());
 	swapChainImageFormat = surfaceFormat.format;
 	swapChainExtent = extent;
 }
@@ -831,6 +870,8 @@ void Renderer::CreateGraphicsPipeline()
 		.pColorAttachmentFormats = &swapChainImageFormat,
 		.depthAttachmentFormat = FindDepthFormat(),
 	};
+
+	swapChainSupportValues.createInfo = PipelineRenderingCreateInfo;
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1058,7 +1099,7 @@ void Renderer::CreateCommandBuffers()
 	}
 }
 
-void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects)
+void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData)
 {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1205,10 +1246,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 
 		vkCmdBindIndexBuffer(CmdBuffer, obj.get()->GetMesh()->GetIndexBuffer().buffer, 0, VK_INDEX_TYPE_UINT32);
 
-		static float xRot = 30;
-		Transform t{ .position = glm::vec3(0, 0, 0), .rotation = glm::vec3(xRot, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5)};
-		xRot += 0.1;
-		obj->SetTransform(t);
 		//The magic function
 		glm::mat4 modelMatrix(1.f);
 		modelMatrix = glm::translate(modelMatrix, obj->GetTransform().position);
@@ -1228,6 +1265,8 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstant), &constant);
 		vkCmdDrawIndexed(CmdBuffer, obj.get()->GetMesh()->primitives[0].count, 1, 0, 0, 0);
 	}
+
+	ImGui_ImplVulkan_RenderDrawData(drawData, CmdBuffer);
 
 	vkCmdEndRendering(CmdBuffer);
 
@@ -1265,6 +1304,25 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 	if (vkEndCommandBuffer(CmdBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("Could not record command buffer!");
 	}
+}
+
+ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
+	// Start the Dear ImGui frame
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+
+	ImGui::Begin("Spawn Panel");
+	if (ImGui::Button("Spawn Spaceship")) {
+		s->CreateObject<Object>();
+	}
+	if (ImGui::Button("Spawn small asteroid")) {
+		s->CreateObject<Object>("../DefaultContent/Meshes/SM_Asteroid_SML_A.obj", "../DefaultContent/Textures/Asteroid_SML_CLR.png");
+	}
+	ImGui::End();
+
+	ImGui::Render();
+	return ImGui::GetDrawData();
 }
 
 void Renderer::CreateSyncObjects()

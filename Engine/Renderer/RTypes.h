@@ -13,6 +13,7 @@
 #include "glm/gtx/hash.hpp"
 
 #include "../../include/vk_mem_alloc.h"
+#include "../../include/imgui/imgui.h"
 
 
 struct VmaBuffer {

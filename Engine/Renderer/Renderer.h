@@ -36,7 +36,7 @@ public:
 	void Startup();
 	GLFWwindow* GetWindow() { return windowRef; }
 
-	void DrawFrame(const std::vector<std::shared_ptr<class Object>>& objects);
+	void DrawFrame(const std::vector<std::shared_ptr<class Object>>& objects, ImDrawData* drawData);
 
 	VkDevice GetDevice() { return device; };
 
@@ -109,6 +109,14 @@ private:
 
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
+	struct SwapChainSupportValues {
+		uint32_t imageCount;
+		uint32_t queueFamily;
+		VkQueue queue;
+		VkPipelineRenderingCreateInfoKHR createInfo;
+	};
+
+	SwapChainSupportValues swapChainSupportValues {};
 	//Map hardware to logical device and create queues
 	VkDevice device;
 	void CreateLogicalDevice();
@@ -169,8 +177,10 @@ private:
 	//Command Buffer
 	std::vector<VkCommandBuffer> CommandBuffers; //TODO: Move to frame data struct
 	void CreateCommandBuffers();
-	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects);
-
+	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData);
+public:
+	ImDrawData* RenderImGUIElements(Scene* s); //Function that contains ImGUI logic
+private:
 	//Starts vulkan GPU commands and returns the command buffer
 	VkCommandBuffer BeginSingleTimeCommands();
 

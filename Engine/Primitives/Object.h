@@ -12,24 +12,18 @@
 #include "Material.h"
 #include "string"
 #include <memory>
+#include "Empty.h"
 
 class Scene;
 
-struct Transform {
-	glm::vec3 position;
-	glm::vec3 rotation;
-	glm::vec3 scale;
-};
 
-class Object {
-
-public:
+//Base class for anything that is rendered in the scene
+class Object : public Empty {
 
 protected:
 	std::shared_ptr<Mesh> MeshRef;
 	std::shared_ptr<Texture> TextureRef;
 	std::shared_ptr<Material> MaterialRef;
-	Transform objTransform;
 
 	std::string PATH_TO_MODEL = "";
 	std::string PATH_TO_TEXTURE = "";
@@ -46,28 +40,22 @@ public:
 	Mesh* GetMesh() { return MeshRef.get(); };
 	Texture* GetTexture() { return TextureRef.get(); };
 
-	const Transform GetTransform() { return objTransform; };
-	void SetTransform(Transform t) { objTransform = t; };
-
 	std::string GetModelPath() { return PATH_TO_MODEL; };
 	std::string GetTexturePath() { return PATH_TO_TEXTURE; };
 
-	void SetLevelReference(Scene* scene) { SceneRef = scene; }
-	Scene* GetLevel() { return SceneRef; };
+
 
 	float GetKa() const { return Ka; }
 	float GetKd() { return Kd; }
 	float GetKs() { return Ks; }
 
 	Object();
-	Object(Transform t, std::string model, std::string tex);
-
-	virtual void Tick();
+	Object(std::string model, std::string tex);
 
 	bool bIsDirty;
 
-private:
-	Scene* SceneRef;
+	void Tick() override;
+	void Begin() override;
 };
 
 

@@ -58,6 +58,7 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 	auto loadedMesh = LoadedMeshes.find(modelPath);
 	if (loadedMesh != LoadedMeshes.end()) {
 		//Return the pointer of the texture
+		std::cout << "Used previously loaded mesh" << std::endl;
 		return loadedMesh->second;
 	}
 

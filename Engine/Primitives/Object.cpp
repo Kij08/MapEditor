@@ -3,11 +3,10 @@
 //
 
 #include "Object.h"
-#include "../Scene/Scene.h"
 
 Object::Object()
 {
-    Transform t = { .position = glm::vec3(0, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(1, 1, 1) };
+    Transform t = { .position = glm::vec3(0, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5) };
     SetTransform(t);
     PATH_TO_MODEL = "../DefaultContent/Meshes/CH_Player_Ship.obj";
     PATH_TO_TEXTURE = "../DefaultContent/Textures/SpaceShip_CLR.png";
@@ -17,8 +16,9 @@ Object::Object()
     Ks = 0;
 }
 
-Object::Object(Transform t, std::string model, std::string tex)
+Object::Object(std::string model, std::string tex)
 {
+    Transform t = { .position = glm::vec3(0, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5) };
     SetTransform(t);
     PATH_TO_MODEL = model;
     PATH_TO_TEXTURE = tex;
@@ -30,4 +30,11 @@ Object::Object(Transform t, std::string model, std::string tex)
 
 void Object::Tick()
 {
+
+    objTransform.rotation.x += 0.1;
+    objTransform.rotation.y += 0.5;
+}
+
+void Object::Begin() {
+
 }

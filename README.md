@@ -11,16 +11,16 @@ has turned into more of a custom game engine.
   - Texture and Mesh loading
   - Vulkan buffer updates
 - Functioning draw loop 🟢
-- Implement ImGUI <- Currently here
+- Implement ImGUI 🟢
   - Adding buttons for creating new objects
   - Fields for editing an objects mesh/texture/material
   - etc.. 
-- Implement map creation features
-  - Moving in viewport
-  - Placing and deleting objects
+- Implement map creation/Game engine features <- Currently here
+  - Input handling
+  - Placing, deleting, and editing objects
 -  Implement map loading and saving
 
-# Libraries
+# Included Libraries
 - stb_image
 - tiny_obj_loader
 - VMA
@@ -28,6 +28,7 @@ has turned into more of a custom game engine.
 
 # Dependencies
 - Vulkan 1.4
+- GLFW
 
 Developed and tested on Linux.
 

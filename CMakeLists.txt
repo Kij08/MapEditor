@@ -23,4 +23,23 @@ add_executable(MapEditor main.cpp
         Engine/Renderer/RDescriptors.cpp
         Engine/Renderer/RDescriptors.h
         Engine/Renderer/RTypes.h
-        Engine/Renderer/RTypes.cpp)
+        Engine/Renderer/RTypes.cpp
+        include/imgui/imconfig.h
+        include/imgui/imgui.cpp
+        include/imgui/imgui.h
+        include/imgui/imgui_demo.cpp
+        include/imgui/imgui_draw.cpp
+        include/imgui/imgui_impl_glfw.cpp
+        include/imgui/imgui_impl_glfw.h
+        include/imgui/imgui_impl_vulkan.cpp
+        include/imgui/imgui_impl_vulkan.h
+        include/imgui/imgui_internal.h
+        include/imgui/imgui_tables.cpp
+        include/imgui/imgui_widgets.cpp
+        include/imgui/imstb_rectpack.h
+        include/imgui/imstb_textedit.h
+        include/imgui/imstb_truetype.h
+        Engine/Utils/InputManager.cpp
+        Engine/Utils/InputManager.h
+        Engine/Primitives/Empty.cpp
+        Engine/Primitives/Empty.h)
