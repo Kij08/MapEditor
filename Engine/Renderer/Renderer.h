@@ -36,7 +36,7 @@ public:
 	void Startup();
 	GLFWwindow* GetWindow() { return windowRef; }
 
-	void DrawFrame(const std::vector<std::shared_ptr<class Object>>& objects, ImDrawData* drawData);
+	void DrawFrame(const std::vector<std::shared_ptr<class Object>>& objects, ImDrawData* drawData, glm::vec3 cameraDirection, glm::vec3 cameraPosition);
 
 	VkDevice GetDevice() { return device; };
 
@@ -177,7 +177,8 @@ private:
 	//Command Buffer
 	std::vector<VkCommandBuffer> CommandBuffers; //TODO: Move to frame data struct
 	void CreateCommandBuffers();
-	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData);
+	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData,
+		glm::vec3 cameraDirection, glm::vec3 cameraPosition);
 public:
 	ImDrawData* RenderImGUIElements(Scene* s); //Function that contains ImGUI logic
 private:
@@ -235,7 +236,7 @@ private:
 		float Ks;
 	};
 
-	void UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex);
+	void UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex, glm::vec3 cameraDirection, glm::vec3 cameraPosition);
 
 	VkSampler TextureSampler;
 

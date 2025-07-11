@@ -177,7 +177,7 @@ void Renderer::Startup() {
 
 
 //Draw call
-void Renderer::DrawFrame(const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData)
+void Renderer::DrawFrame(const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData, glm::vec3 cameraDirection, glm::vec3 cameraPosition)
 {
 	//Wait for previous frame to finish
 	vkWaitForFences(device, 1, &InFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -197,7 +197,7 @@ void Renderer::DrawFrame(const std::vector<std::shared_ptr<Object>>& objects, Im
 
 	vkResetCommandBuffer(CommandBuffers[currentFrame], 0);
 
-	RecordCommandBuffer(CommandBuffers[currentFrame], imageIndex, currentFrame, objects, drawData);
+	RecordCommandBuffer(CommandBuffers[currentFrame], imageIndex, currentFrame, objects, drawData, cameraDirection, cameraPosition);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1099,7 +1099,8 @@ void Renderer::CreateCommandBuffers()
 	}
 }
 
-void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData)
+void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects,
+	ImDrawData* drawData, glm::vec3 cameraDirection, glm::vec3 cameraPosition)
 {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1201,7 +1202,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		.pDepthAttachment = &DepthAttachInfo
 	};
 
-	UpdateUniformBuffer(CmdBuffer, frameIndex); //Update uniform buffer for this frame
+	UpdateUniformBuffer(CmdBuffer, frameIndex, cameraDirection, cameraPosition); //Update uniform buffer for this frame
 
 	///Start Draw
 	vkCmdBeginRendering(CmdBuffer, &RenderInfo);
@@ -1528,11 +1529,11 @@ void Renderer::CreateDescriptorSets() //Each object probably needs a descriptor 
 	}
 }
 
-void Renderer::UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex)
+void Renderer::UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex, glm::vec3 cameraDirection, glm::vec3 cameraPosition)
 {
 	UniformBufferObject ubo{};
 
-	ubo.view = glm::lookAt(glm::vec3(500.0f, 30.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 0.0f, 1.0f));
 
 	ubo.proj = glm::perspective(glm::radians(70.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 1000.f);
 

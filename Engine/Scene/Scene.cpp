@@ -10,7 +10,9 @@ void Scene::InitScene() {
     CreateObject<Object>();
 }
 
-void Scene::Tick() {
+void Scene::Tick(float deltaTime) {
+    currentDeltaTime = deltaTime;
+    sceneViewer.Tick();
     for (auto obj : objects) {
         obj->Tick();
     }

@@ -49,8 +49,8 @@ public:
 	float GetKd() { return Kd; }
 	float GetKs() { return Ks; }
 
-	Object();
-	Object(std::string model, std::string tex);
+	explicit Object(Scene* s);
+	Object(Scene* s, std::string model, std::string tex);
 
 	bool bIsDirty;
 

@@ -42,4 +42,6 @@ add_executable(MapEditor main.cpp
         Engine/Utils/InputManager.cpp
         Engine/Utils/InputManager.h
         Engine/Primitives/Empty.cpp
-        Engine/Primitives/Empty.h)
+        Engine/Primitives/Empty.h
+        Engine/Primitives/Camera.cpp
+        Engine/Primitives/Camera.h)

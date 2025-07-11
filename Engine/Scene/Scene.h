@@ -14,7 +14,6 @@ struct ObjectMaterialGrouping {
 };
 
 class Scene {
-
 protected:
     //List of all objects, grouped by material
     std::vector<ObjectMaterialGrouping> materialGroupings;
@@ -26,6 +25,7 @@ protected:
 private:
 
 public:
+    Scene() : sceneViewer(this) {};
 
     void InitScene();
 
@@ -34,8 +34,7 @@ public:
         static_assert(std::is_base_of<Object, TObject>::value, "Not an Object");
 
         //Setup code for all objects
-        std::shared_ptr<TObject> obj = std::make_shared<Object>();
-        obj->SetLevelReference(this);
+        std::shared_ptr<TObject> obj = std::make_shared<Object>(this);
         objects.push_back(obj);
         sceneAssetManager.LoadObject(obj.get());
         obj->Begin();
@@ -47,8 +46,7 @@ public:
         static_assert(std::is_base_of<Object, TObject>::value, "Not an Object");
 
         //Setup code for all objects
-        std::shared_ptr<TObject> obj = std::make_shared<Object>(model, texture);
-        obj->SetLevelReference(this);
+        std::shared_ptr<TObject> obj = std::make_shared<Object>(this, model, texture);
         objects.push_back(obj);
         sceneAssetManager.LoadObject(obj.get());
         obj->Begin();
@@ -57,7 +55,11 @@ public:
 
     const std::vector<std::shared_ptr<Object>>& GetObjectList() { return objects; }
 
-    void Tick();
+    void Tick(float deltaTime);
+    float currentDeltaTime;
+
+    glm::vec3 GetCameraForwardDirection() { return sceneViewer.GetCamera()->GetCameraForward(); };
+    glm::vec3 GetCameraPosition() { return sceneViewer.GetTransform().position; };
 };
 
 #endif //SCENE_H
