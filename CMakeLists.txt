@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.31)
 project(MapEditor)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20 CMAKE_EXE_LINKER_FLAGS -static CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s -O3")
 add_link_options(-lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi)
 include_directories(/include /include/imgui)
 
@@ -39,6 +39,8 @@ add_executable(MapEditor main.cpp
         include/imgui/imstb_rectpack.h
         include/imgui/imstb_textedit.h
         include/imgui/imstb_truetype.h
+        include/imgui/imgui_stdlib.cpp
+        include/imgui/imgui_stdlib.h
         Engine/Utils/InputManager.cpp
         Engine/Utils/InputManager.h
         Engine/Primitives/Empty.cpp

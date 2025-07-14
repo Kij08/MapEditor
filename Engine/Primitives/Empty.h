@@ -7,9 +7,8 @@
 
 #include <glm/fwd.hpp>
 #include <glm/vec3.hpp>
+#include <string>
 
-
-class Scene;
 
 struct Transform {
     glm::vec3 position;
@@ -17,23 +16,28 @@ struct Transform {
     glm::vec3 scale;
 };
 
+class Scene;
 //Base class for anything in the scene
 class Empty {
 public:
     Empty() = delete;
-    explicit Empty(Scene* s) : SceneRef(s),
-            objTransform({glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)}){}
-    Empty(Scene* s, Transform t) : SceneRef(s),
-        objTransform(t){}
+    explicit Empty(Scene* s);
+
+    Empty(Scene* s, Transform t);
 protected:
     Transform objTransform;
     Scene* SceneRef;
+
+    std::string ObjectDisplayName;
+    uint32_t objectID;
 
 public:
     const Transform GetTransform() { return objTransform; };
     void SetTransform(Transform t) { objTransform = t; };
 
     Scene* GetLevel() { return SceneRef; };
+
+    std::string GetDisplayName() { return ObjectDisplayName; };
 
     virtual void Tick() {};
     virtual void Begin() {};

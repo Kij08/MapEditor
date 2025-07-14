@@ -253,12 +253,16 @@ public:
 private:
 
 	TextureAllocation DepthTexture;
+	TextureAllocation PickingDepthTexture;
 
 	void CreateDepthResources();
 
 	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 	VkFormat FindDepthFormat();
 	bool HasStencilComponent(VkFormat format);
+
+public:
+	bool bShouldPick = false;
 
 };
 

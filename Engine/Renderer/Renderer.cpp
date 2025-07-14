@@ -185,6 +185,7 @@ void Renderer::DrawFrame(const std::vector<std::shared_ptr<Object>>& objects, Im
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, ImageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
+	//If swapchain images are out of date due to an image resize, then don't render anything but fix the images
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		RecreateSwapChain();
 		return;
@@ -1191,7 +1192,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		.clearValue = clearValues[1]
 	};
 
-	VkRect2D renderingArea = {VkOffset2D{}, VkExtent2D{WIDTH, HEIGHT}};
+	VkRect2D renderingArea = {VkOffset2D{}, VkExtent2D{swapChainExtent.width, swapChainExtent.height}};
 
 	const VkRenderingInfoKHR RenderInfo {
 		.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
@@ -1271,6 +1272,41 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 
 	vkCmdEndRendering(CmdBuffer);
 
+	//Begin new draw commands for mouse picking
+	if (bShouldPick) {
+		//Info for dynamic rendering
+		std::array<VkClearValue, 1> pickingClearValues{};
+		clearValues[1].depthStencil = { 1.0f, 0 };
+
+		const VkRenderingAttachmentInfoKHR PickingDepthAttachInfo {
+			.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+			.imageView = PickingDepthTexture.TextureImageView,
+			.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+			.resolveMode = VK_RESOLVE_MODE_NONE,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.clearValue = clearValues[1]
+		};
+
+		VkRect2D pickingRenderingArea = {VkOffset2D{}, VkExtent2D{1, 1}};
+
+		const VkRenderingInfoKHR PickingRenderInfo {
+			.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
+			.renderArea = pickingRenderingArea,
+			.layerCount = 1,
+			.colorAttachmentCount = 1,
+			.pDepthAttachment = &PickingDepthAttachInfo
+		};
+
+		///Start Draw
+		vkCmdBeginRendering(CmdBuffer, &PickingRenderInfo);
+
+		VkRect2D pickScissor{};
+		pickScissor.offset = { 0, 0 };
+		pickScissor.extent = {1, 1};
+		vkCmdSetScissor(CmdBuffer, 0, 1, &pickScissor);
+	}
+
 	//Transition colour swapchain images to present bit for optimal rendering
 	const VkImageMemoryBarrier ImgMemBarrierPresentTransition {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1300,18 +1336,65 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		&ImgMemBarrierPresentTransition // pImageMemoryBarriers
 	);
 
-
-
 	if (vkEndCommandBuffer(CmdBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("Could not record command buffer!");
 	}
 }
 
 ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
+	static int selectedIndex = -1;
+
 	// Start the Dear ImGui frame
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
+
 	ImGui::NewFrame();
+
+	ImGui::Begin("Scene Tree");
+		for (int i = 0; i < s->GetSceneRoot()->children.size(); i++) {
+			//Store the index of the selected object
+			auto c = s->GetSceneRoot()->children[i];
+
+			if (ImGui::Button(c->GetObjName().c_str())) {
+				selectedIndex = i;
+			};
+		}
+	ImGui::End();
+
+	ImGui::Begin("Object Info Panel");
+	//If there is a selected object show its details
+
+
+	if (selectedIndex >= 0) {
+		float pos[3] = {s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().position.x,
+			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().position.y,
+			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().position.z
+		};
+
+		float rot[3] = {s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().rotation.x,
+			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().rotation.y,
+			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().rotation.z
+		};
+
+		float scale[3] = {s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().scale.x,
+			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().scale.y,
+			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().scale.z
+		};
+
+		ImGui::DragFloat3("Position", pos);
+		ImGui::DragFloat3("Rotation", rot);
+		ImGui::DragFloat3("Scale", scale);
+
+		Transform t = {glm::vec3{pos[0], pos[1], pos[2]}, glm::vec3{rot[0], rot[1], rot[2]}, glm::vec3{scale[0], scale[1], scale[2]}};
+
+		s->GetSceneRoot()->children[selectedIndex]->thisObject->SetTransform(t);
+
+		auto io = ImGui::GetIO();
+		if (!io.WantCaptureMouse && io.MouseDown[0]) {
+			selectedIndex = -1;
+		}
+	}
+	ImGui::End();
 
 	ImGui::Begin("Spawn Panel");
 	if (ImGui::Button("Spawn Spaceship")) {
@@ -1535,7 +1618,7 @@ void Renderer::UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex, glm::
 
 	ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 0.0f, 1.0f));
 
-	ubo.proj = glm::perspective(glm::radians(70.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 1000.f);
+	ubo.proj = glm::perspective(glm::radians(70.0f), swapChainExtent.width / (float)swapChainExtent.height, 1.f, 10000.f);
 
 	//Y axis transformation since glm is for OpenGL
 	ubo.proj[1][1] *= -1;
@@ -1784,6 +1867,7 @@ void Renderer::CreateDepthResources()
 {
 	VkFormat depthFormat = FindDepthFormat();
 	DepthTexture = CreateImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT).GetAllocation();
+	PickingDepthTexture = CreateImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT).GetAllocation();
 }
 
 VkFormat Renderer::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
