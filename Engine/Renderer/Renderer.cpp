@@ -18,6 +18,7 @@
 
 #include "../../include/imgui/imgui_impl_glfw.h"
 #include "../../include/imgui/imgui_impl_vulkan.h"
+#include "../../include/imgui/imgui_internal.h"
 
 #include "../Scene/Scene.h"
 
@@ -137,7 +138,7 @@ void Renderer::Startup() {
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_Docking; TODO: Switch ImGui branch to docking branch
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	ImGui::StyleColorsDark();
 
 	ChooseDevice();
@@ -1351,10 +1352,23 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 
 	ImGui::NewFrame();
 
-	ImGui::ShowDemoWindow();
+	ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_PassthruCentralNode;
+	ImGuiID dockSpaceID = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), flags);
+
+	//Set button pos to always be in the top left of the centre viewport
+	ImVec2 centrePos = ImGui::DockBuilderGetCentralNode(dockSpaceID)->Pos;
+	ImGui::SetNextWindowPos(centrePos, ImGuiCond_Always);
+	ImGuiWindowFlags mainViewportBarFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize;
+	if (ImGui::Begin("ViewportButtons", 0, mainViewportBarFlags)) {
+		if (ImGui::Button(to_string(s->GetViewer()->GetState()).c_str(), ImVec2(80, 20))) {
+			s->GetViewer()->EnumerateState();
+		}
+		ImGui::End();
+	}
 
 	static bool bShowDetailsPanel = true;
 	static bool bShowSpawnPanel = true;
+	static bool bShowSceneTreePanel = true;
 
 	if (ImGui::BeginMainMenuBar())
 	{
@@ -1378,23 +1392,28 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 			if (ImGui::MenuItem("Spawn Panel")) {
 				bShowSpawnPanel = !bShowSpawnPanel;
 			}
+			if (ImGui::MenuItem("Scene Tree Panel")) {
+				bShowSceneTreePanel = !bShowSceneTreePanel;
+			}
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();
 	}
 
-	ImGui::Begin("Scene Tree");
-	//Begin recursive tree render
-	SceneNode* newNode = s->GetSceneRoot()->AddUITreeNode();
-	if (newNode != nullptr) {
-		//There is a new selected node
-		if (selectedNode) {
-			//Check if selected node is not nullptr incase there is no previous selection
-			selectedNode->isSelected = false;
+	if (bShowSceneTreePanel) {
+		ImGui::Begin("Scene Tree");
+		//Begin recursive tree render
+		SceneNode* newNode = s->GetSceneRoot()->AddUITreeNode();
+		if (newNode != nullptr) {
+			//There is a new selected node
+			if (selectedNode) {
+				//Check if selected node is not nullptr incase there is no previous selection
+				selectedNode->isSelected = false;
+			}
+			selectedNode = newNode;
 		}
-		selectedNode = newNode;
+		ImGui::End();
 	}
-	ImGui::End();
 
 	if (bShowDetailsPanel) {
 		ImGui::Begin("Object Info Panel");

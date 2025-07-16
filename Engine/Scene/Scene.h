@@ -156,6 +156,7 @@ public:
     void Tick(float deltaTime);
     float currentDeltaTime = 0;
 
+    SceneViewer* GetViewer() { return &sceneViewer; }
     glm::vec3 GetCameraForwardDirection() { return sceneViewer.GetCamera()->GetCameraForward(); };
     glm::vec3 GetCameraPosition() { return sceneViewer.GetTransform().position; };
 

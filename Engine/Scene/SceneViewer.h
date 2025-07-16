@@ -15,7 +15,10 @@ enum class EViewerState {
     VIEWER_PLACE,
     VIEWER_MOVE, //Move and NOSTATE should always be at the end of the enum
     VIEWER_NOSTATE
+
 };
+
+std::string to_string(EViewerState state);
 
 class SceneViewer : IInputResponse, public Empty {
 public:
@@ -23,6 +26,9 @@ public:
 
     //Returns true if state was set successfully
     bool SetState(EViewerState newState);
+    EViewerState GetState() { return ViewerState; };
+    //Cycle through viewer states
+    void EnumerateState();
 
     void Begin() override;
     void Tick() override;

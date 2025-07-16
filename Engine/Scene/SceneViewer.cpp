@@ -11,6 +11,21 @@
 
 #include "Scene.h"
 
+std::string to_string(EViewerState state) {
+    switch (state) {
+        case EViewerState::VIEWER_EDIT:
+            return "Edit Mode";
+        case EViewerState::VIEWER_PLACE:
+            return "Place Mode";
+        case EViewerState::VIEWER_MOVE:
+            return "Move Mode";
+        case EViewerState::VIEWER_NOSTATE:
+            return "No state";
+        default:
+            return "Unknown";
+    }
+}
+
 bool SceneViewer::SetState(EViewerState newState) {
 
     if (newState == EViewerState::VIEWER_MOVE && ImGui::GetIO().WantCaptureMouse) {
@@ -25,6 +40,31 @@ bool SceneViewer::SetState(EViewerState newState) {
         moveVector = glm::vec3(0.0f, 0.0f, 0.0f);
     }
     return true;
+}
+
+void SceneViewer::EnumerateState() {
+    if (ViewerState >= EViewerState::VIEWER_MOVE) {
+        //If the state is currently move or no state then switch previous state in order to return to the new state when movement is ended
+        if (PreviousState >= EViewerState::VIEWER_MOVE) {
+            //If previous state reaches move through cycling through states reset it back to the first state
+            SetPreviousState(static_cast<EViewerState>(0));
+        }
+        else {
+            //Cycle through states
+            SetPreviousState(static_cast<EViewerState>(static_cast<int>(PreviousState) + 1));
+        }
+    }
+    else {
+        //If the state is not in movement then cycle states until we reach movement. Then we loop back to the beginning
+        if (PreviousState >= EViewerState::VIEWER_MOVE) {
+            //If state reaches move through cycling through states reset it back to the first state
+            SetState(static_cast<EViewerState>(0));
+        }
+        else {
+            //Cycle through states
+            SetState(static_cast<EViewerState>(static_cast<int>(ViewerState) + 1));
+        }
+    }
 }
 
 void SceneViewer::RespondToMouseButton(GLFWwindow* window, int button, int action, int mods) {
@@ -46,28 +86,7 @@ void SceneViewer::RespondToMouseButton(GLFWwindow* window, int button, int actio
         break;
         case GLFW_MOUSE_BUTTON_MIDDLE:
             if (action == GLFW_PRESS) {
-                if (ViewerState >= EViewerState::VIEWER_MOVE) {
-                    //If the state is currently move or no state then switch previous state in order to return to the new state when movement is ended
-                    if (PreviousState >= EViewerState::VIEWER_MOVE) {
-                        //If previous state reaches move through cycling through states reset it back to the first state
-                        SetPreviousState(static_cast<EViewerState>(0));
-                    }
-                    else {
-                        //Cycle through states
-                        SetPreviousState(static_cast<EViewerState>(static_cast<int>(PreviousState) + 1));
-                    }
-                }
-                else {
-                    //If the state is not in movement then cycle states until we reach movement. Then we loop back to the beginning
-                    if (PreviousState >= EViewerState::VIEWER_MOVE) {
-                        //If state reaches move through cycling through states reset it back to the first state
-                        SetState(static_cast<EViewerState>(0));
-                    }
-                    else {
-                        //Cycle through states
-                        SetState(static_cast<EViewerState>(static_cast<int>(ViewerState) + 1));
-                    }
-                }
+                EnumerateState();
             }
         break;
         case GLFW_MOUSE_BUTTON_LEFT:
@@ -135,7 +154,18 @@ void SceneViewer::RespondToKey(GLFWwindow *window, int key, int scancode, int ac
                     break;
             }
         }
-
+    }
+    else if (ViewerState == EViewerState::VIEWER_EDIT) {
+        if (action == GLFW_PRESS) {
+            switch (key) {
+                case GLFW_KEY_W:
+                    break;
+                case GLFW_KEY_E:
+                    break;
+                case GLFW_KEY_Q:
+                    break;
+            }
+        }
     }
 }
 
