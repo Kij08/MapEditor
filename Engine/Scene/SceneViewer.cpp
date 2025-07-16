@@ -11,7 +11,12 @@
 
 #include "Scene.h"
 
-void SceneViewer::SetState(EViewerState newState) {
+bool SceneViewer::SetState(EViewerState newState) {
+
+    if (newState == EViewerState::VIEWER_MOVE && ImGui::GetIO().WantCaptureMouse) {
+        return false;
+    }
+
     PreviousState = ViewerState;
     ViewerState = newState;
 
@@ -19,6 +24,7 @@ void SceneViewer::SetState(EViewerState newState) {
     if (PreviousState == EViewerState::VIEWER_MOVE) {
         moveVector = glm::vec3(0.0f, 0.0f, 0.0f);
     }
+    return true;
 }
 
 void SceneViewer::RespondToMouseButton(GLFWwindow* window, int button, int action, int mods) {
@@ -26,14 +32,16 @@ void SceneViewer::RespondToMouseButton(GLFWwindow* window, int button, int actio
         case GLFW_MOUSE_BUTTON_RIGHT:
             if (action == GLFW_PRESS) {
                 //Set state to move and disable the cursor
-                SetState(EViewerState::VIEWER_MOVE);
-                std::cout << "Move Mode" << std::endl;
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                if (SetState(EViewerState::VIEWER_MOVE)) {
+                    std::cout << "Move Mode" << std::endl;
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                }
             }
             else if (action == GLFW_RELEASE) {
                 //When moving is finished return to previous state and reset cursor lock
-                SetState(PreviousState);
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                if (SetState(PreviousState)) {
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                }
             }
         break;
         case GLFW_MOUSE_BUTTON_MIDDLE:
@@ -142,11 +150,13 @@ void SceneViewer::RespondToCursor(GLFWwindow* window, double xPos, double yPos) 
 }
 
 void SceneViewer::RespondToScroll(GLFWwindow *window, double xOffset, double yOffset) {
-    if (yOffset > 0) {
-        objTransform.position += camera.GetCameraForward() * scrollMoveDistance;
-    }
-    else if (yOffset < 0) {
-        objTransform.position -= camera.GetCameraForward() * scrollMoveDistance;
+    if (!ImGui::GetIO().WantCaptureMouse) {
+        if (yOffset > 0) {
+            objTransform.position += camera.GetCameraForward() * scrollMoveDistance;
+        }
+        else if (yOffset < 0) {
+            objTransform.position -= camera.GetCameraForward() * scrollMoveDistance;
+        }
     }
 }
 

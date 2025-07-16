@@ -16,6 +16,7 @@ struct SceneNode {
     std::shared_ptr<Empty> thisObject;
 
     bool isRoot = false;
+    bool isSelected = false;
 
     std::string GetObjName() {
         return thisObject->GetDisplayName();
@@ -23,6 +24,58 @@ struct SceneNode {
 
     void AddChild(SceneNode* child) {
         children.push_back(child);
+    }
+
+    //Recursively adds nodes to imgui tree node and returns an int >= 0 if a tree node was clicked
+    SceneNode* AddUITreeNode() {
+        SceneNode* selectedNode = nullptr;
+        if (isRoot == false) {
+            ImGuiTreeNodeFlags flag = 0;
+            if (children.empty()) {
+                flag = ImGuiTreeNodeFlags_Leaf;
+            }
+            bool didStyling = false;
+            if (isSelected) {
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(200, 50, 50, 255));
+                didStyling = true;
+            }
+            if (ImGui::TreeNodeEx(GetObjName().c_str(), flag)) {
+
+                //Store the selected object
+                if (ImGui::IsItemClicked()) {
+                    selectedNode = this;
+                    isSelected = true;
+                }
+                ImGui::TreePop();
+            };
+            if (didStyling) {
+                ImGui::PopStyleColor();
+            }
+            SceneNode* node;
+            for (auto child : children) {
+                node = child->AddUITreeNode();
+                if (node) {
+                    selectedNode = node;
+                }
+            }
+        }
+        else {
+            //If this is the scene root then create the root tree node
+            ImGuiTreeNodeFlags flag = ImGuiTreeNodeFlags_DefaultOpen;
+
+            if (ImGui::TreeNodeEx("Scene Root", flag))
+            {
+                ImGui::TreePop();
+            }
+            SceneNode* node;
+            for (auto child : children) {
+                node = child->AddUITreeNode();
+                if (node) {
+                    selectedNode = node;
+                }
+            }
+        }
+        return selectedNode;
     }
 
     SceneNode() {
@@ -37,7 +90,7 @@ struct SceneNode {
     };
 
     ~SceneNode() {
-        //Loop through all children nodes and delete their children down the tree
+        //Recurse through all children nodes and delete their children down the tree
         for (auto child : children) {
             delete child;
         }

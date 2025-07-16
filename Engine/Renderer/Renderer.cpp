@@ -137,6 +137,7 @@ void Renderer::Startup() {
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_Docking; TODO: Switch ImGui branch to docking branch
 	ImGui::StyleColorsDark();
 
 	ChooseDevice();
@@ -1342,7 +1343,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 }
 
 ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
-	static int selectedIndex = -1;
+	static SceneNode* selectedNode = nullptr;
 
 	// Start the Dear ImGui frame
 	ImGui_ImplVulkan_NewFrame();
@@ -1350,60 +1351,101 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 
 	ImGui::NewFrame();
 
+	ImGui::ShowDemoWindow();
+
+	static bool bShowDetailsPanel = true;
+	static bool bShowSpawnPanel = true;
+
+	if (ImGui::BeginMainMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("Open..", "Ctrl+O")) { /* Do stuff */ }
+			if (ImGui::MenuItem("Save", "Ctrl+S"))   { /* Do stuff */ }
+			if (ImGui::MenuItem("Close", "Ctrl+W"))  {  }
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Edit"))
+		{
+			if (ImGui::MenuItem("Settings")) { /* Do stuff */ }
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Windows"))
+		{
+			if (ImGui::MenuItem("Details Panel")) {
+				bShowDetailsPanel = !bShowDetailsPanel;
+			}
+			if (ImGui::MenuItem("Spawn Panel")) {
+				bShowSpawnPanel = !bShowSpawnPanel;
+			}
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
+	}
+
 	ImGui::Begin("Scene Tree");
-		for (int i = 0; i < s->GetSceneRoot()->children.size(); i++) {
-			//Store the index of the selected object
-			auto c = s->GetSceneRoot()->children[i];
+	//Begin recursive tree render
+	SceneNode* newNode = s->GetSceneRoot()->AddUITreeNode();
+	if (newNode != nullptr) {
+		//There is a new selected node
+		if (selectedNode) {
+			//Check if selected node is not nullptr incase there is no previous selection
+			selectedNode->isSelected = false;
+		}
+		selectedNode = newNode;
+	}
+	ImGui::End();
 
-			if (ImGui::Button(c->GetObjName().c_str())) {
-				selectedIndex = i;
+	if (bShowDetailsPanel) {
+		ImGui::Begin("Object Info Panel");
+		//If there is a selected object show its details
+
+
+		if (selectedNode) {
+			float pos[3] = {selectedNode->thisObject->GetTransform().position.x,
+				selectedNode->thisObject->GetTransform().position.y,
+				selectedNode->thisObject->GetTransform().position.z
 			};
+
+			float rot[3] = {selectedNode->thisObject->GetTransform().rotation.x,
+				selectedNode->thisObject->GetTransform().rotation.y,
+				selectedNode->thisObject->GetTransform().rotation.z
+			};
+
+			float scale[3] = {selectedNode->thisObject->GetTransform().scale.x,
+				selectedNode->thisObject->GetTransform().scale.y,
+				selectedNode->thisObject->GetTransform().scale.z
+			};
+
+			ImGui::InputFloat3("Position", pos);
+			ImGui::InputFloat3("Rotation", rot);
+			ImGui::InputFloat3("Scale", scale);
+
+			Transform t = {glm::vec3{pos[0], pos[1], pos[2]}, glm::vec3{rot[0], rot[1], rot[2]}, glm::vec3{scale[0], scale[1], scale[2]}};
+
+			selectedNode->thisObject->SetTransform(t);
+
+			//If we click in the viewport on nothing then unfocus the object
+			auto io = ImGui::GetIO();
+			if (!io.WantCaptureMouse && io.MouseDown[0]) {
+				//Clear selected node
+				selectedNode->isSelected = false;
+				selectedNode = nullptr;
+			}
 		}
-	ImGui::End();
+		ImGui::End();
+	}
 
-	ImGui::Begin("Object Info Panel");
-	//If there is a selected object show its details
-
-
-	if (selectedIndex >= 0) {
-		float pos[3] = {s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().position.x,
-			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().position.y,
-			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().position.z
-		};
-
-		float rot[3] = {s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().rotation.x,
-			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().rotation.y,
-			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().rotation.z
-		};
-
-		float scale[3] = {s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().scale.x,
-			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().scale.y,
-			s->GetSceneRoot()->children[selectedIndex]->thisObject->GetTransform().scale.z
-		};
-
-		ImGui::DragFloat3("Position", pos);
-		ImGui::DragFloat3("Rotation", rot);
-		ImGui::DragFloat3("Scale", scale);
-
-		Transform t = {glm::vec3{pos[0], pos[1], pos[2]}, glm::vec3{rot[0], rot[1], rot[2]}, glm::vec3{scale[0], scale[1], scale[2]}};
-
-		s->GetSceneRoot()->children[selectedIndex]->thisObject->SetTransform(t);
-
-		auto io = ImGui::GetIO();
-		if (!io.WantCaptureMouse && io.MouseDown[0]) {
-			selectedIndex = -1;
+	if (bShowSpawnPanel) {
+		ImGui::Begin("Spawn Panel");
+		if (ImGui::Button("Spawn Spaceship")) {
+			s->CreateObject<Object>();
 		}
+		if (ImGui::Button("Spawn small asteroid")) {
+			s->CreateObject<Object>("../DefaultContent/Meshes/SM_Asteroid_SML_A.obj", "../DefaultContent/Textures/Asteroid_SML_CLR.png");
+		}
+		ImGui::End();
 	}
-	ImGui::End();
-
-	ImGui::Begin("Spawn Panel");
-	if (ImGui::Button("Spawn Spaceship")) {
-		s->CreateObject<Object>();
-	}
-	if (ImGui::Button("Spawn small asteroid")) {
-		s->CreateObject<Object>("../DefaultContent/Meshes/SM_Asteroid_SML_A.obj", "../DefaultContent/Textures/Asteroid_SML_CLR.png");
-	}
-	ImGui::End();
 
 	ImGui::Render();
 	return ImGui::GetDrawData();
@@ -1618,7 +1660,7 @@ void Renderer::UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex, glm::
 
 	ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 0.0f, 1.0f));
 
-	ubo.proj = glm::perspective(glm::radians(70.0f), swapChainExtent.width / (float)swapChainExtent.height, 1.f, 10000.f);
+	ubo.proj = glm::perspective(glm::radians(70.0f), swapChainExtent.width / (float)swapChainExtent.height, 1.f, 30000.f);
 
 	//Y axis transformation since glm is for OpenGL
 	ubo.proj[1][1] *= -1;

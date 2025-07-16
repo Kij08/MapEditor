@@ -8,6 +8,7 @@
 #include "../Utils/InputManager.h"
 #include "../Primitives/Empty.h"
 #include "../Primitives/Camera.h"
+#include "../../include/imgui/imgui.h"
 
 enum class EViewerState {
     VIEWER_EDIT,
@@ -20,7 +21,8 @@ class SceneViewer : IInputResponse, public Empty {
 public:
     explicit SceneViewer(Scene* s) : Empty(s, { .position = glm::vec3(20, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5) }), ViewerState(EViewerState::VIEWER_EDIT), PreviousState(EViewerState::VIEWER_NOSTATE), camera(this) {};
 
-    void SetState(EViewerState newState);
+    //Returns true if state was set successfully
+    bool SetState(EViewerState newState);
 
     void Begin() override;
     void Tick() override;
