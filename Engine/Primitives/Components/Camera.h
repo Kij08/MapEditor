@@ -7,10 +7,11 @@
 
 #include <glm/ext/quaternion_geometric.hpp>
 #include "glm/vec3.hpp"
-
+#include "Component.h"
 constexpr glm::vec3 cameraUp = glm::vec3(0.0f, 0.0f, 1.0f);
 
-class Camera {
+class Camera : Component{
+
     float yaw, pitch;
     float lastX, lastY;
     const float sensitivity = 15.f;
@@ -18,7 +19,7 @@ class Camera {
     glm::vec3 cameraForward = glm::vec3(1.0f, 1.0f, 1.0f);
 
 public:
-    explicit Camera(class Empty* o);
+    explicit Camera(Empty* o) : Component(o) {}
 
     //Function for updating the lastPos variables of the camera. This is used if camera movement is started/stopped to prevent jumps in the camera.
     void UpdateMousePos(double xPos, double yPos);
@@ -29,8 +30,9 @@ public:
     glm::vec3 GetCameraForward() { return cameraForward; };
     glm::vec3 GetCameraRight() { return glm::normalize(glm::cross(cameraForward, cameraUp)); };
     static glm::vec3 GetCameraUp() { return cameraUp; };
+
+    void RenderComponentImGui(Scene* s) override;
 private:
-    Empty* Owner;
 };
 
 

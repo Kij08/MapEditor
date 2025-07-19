@@ -19,15 +19,16 @@ struct TextureAllocation {
 class Texture {
 public:
 
-    Texture(const TextureAllocation& tAlloc) {
-      Allocation = tAlloc;
-    };
+    Texture(const TextureAllocation& tAlloc) : Allocation(tAlloc), TextureName("DefaultTexture") {}
 
-    TextureAllocation& GetAllocation() { return Allocation; };
+    Texture(const TextureAllocation& tAlloc, std::string name) : Allocation(tAlloc), TextureName(name) {}
 
+    TextureAllocation& GetAllocation() { return Allocation; }
+    std::string GetName() { return TextureName; }
+    void SetName(std::string name) { TextureName = name; }
 private:
     TextureAllocation Allocation;
-
+    std::string TextureName;
 
 };
 

@@ -26,8 +26,14 @@ std::string to_string(EViewerState state) {
     }
 }
 
+SceneViewer::SceneViewer(Scene *s) :
+    Empty(s, { .position = glm::vec3(20, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5) }),
+    ViewerState(EViewerState::VIEWER_EDIT), PreviousState(EViewerState::VIEWER_EDIT), camera(this) {
+}
+
 bool SceneViewer::SetState(EViewerState newState) {
 
+    //Dont change state to move if ImGui wants the mouse
     if (newState == EViewerState::VIEWER_MOVE && ImGui::GetIO().WantCaptureMouse) {
         return false;
     }
@@ -43,26 +49,15 @@ bool SceneViewer::SetState(EViewerState newState) {
 }
 
 void SceneViewer::EnumerateState() {
-    if (ViewerState >= EViewerState::VIEWER_MOVE) {
-        //If the state is currently move or no state then switch previous state in order to return to the new state when movement is ended
-        if (PreviousState >= EViewerState::VIEWER_MOVE) {
-            //If previous state reaches move through cycling through states reset it back to the first state
-            SetPreviousState(static_cast<EViewerState>(0));
-        }
-        else {
-            //Cycle through states
-            SetPreviousState(static_cast<EViewerState>(static_cast<int>(PreviousState) + 1));
-        }
-    }
-    else {
+    if (ViewerState < EViewerState::VIEWER_MOVE) {
         //If the state is not in movement then cycle states until we reach movement. Then we loop back to the beginning
-        if (PreviousState >= EViewerState::VIEWER_MOVE) {
-            //If state reaches move through cycling through states reset it back to the first state
+        EViewerState nextState = static_cast<EViewerState>(static_cast<int>(ViewerState) + 1);
+        if (nextState == EViewerState::VIEWER_MOVE) {
+            //If the next state would be move then reset state to beginning state.
             SetState(static_cast<EViewerState>(0));
         }
         else {
-            //Cycle through states
-            SetState(static_cast<EViewerState>(static_cast<int>(ViewerState) + 1));
+            SetState(nextState);
         }
     }
 }
@@ -180,6 +175,7 @@ void SceneViewer::RespondToCursor(GLFWwindow* window, double xPos, double yPos) 
 }
 
 void SceneViewer::RespondToScroll(GLFWwindow *window, double xOffset, double yOffset) {
+    //Moving forward or backwards in viewport based on scroll input
     if (!ImGui::GetIO().WantCaptureMouse) {
         if (yOffset > 0) {
             objTransform.position += camera.GetCameraForward() * scrollMoveDistance;
@@ -203,6 +199,7 @@ void SceneViewer::Begin() {
     //Register inputs to listen for
     RegisterCursorCallback(this);
     RegisterButtonCallback(this, GLFW_MOUSE_BUTTON_RIGHT);
+    RegisterButtonCallback(this, GLFW_MOUSE_BUTTON_MIDDLE);
     RegisterScrollCallback(this);
     RegisterKeyCallback(this, GLFW_KEY_W);
     RegisterKeyCallback(this, GLFW_KEY_A);

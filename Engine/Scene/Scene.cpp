@@ -23,6 +23,5 @@ void Scene::Tick(float deltaTime) {
 }
 
 Scene::~Scene() {
-
 }
 

@@ -23,19 +23,14 @@ layout( push_constant ) uniform constants
 {
 	mat4 modelMatrix;
     VertexBuffer vertexBuffer;
-    float Ka;
-    float Kd;
-    float Ks;
+    bool isSelected;
 } PushConstants;
 
 
-layout(location = 0) out vec3 fragColour;
+layout(location = 0) out vec3 fragColourTint;
 layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out vec3 surfaceNormal;
-layout(location = 3) out float Ka;
-layout(location = 4) out float Kd;
-layout(location = 5) out float Ks;
-layout(location = 6) out vec3 fragPos;
+layout(location = 3) out vec3 fragPos;
 
 void main() {
     //Load vertex data from vertex bufferdevice adress
@@ -43,11 +38,13 @@ void main() {
 
     gl_Position = ubo.proj * ubo.view * PushConstants.modelMatrix * vec4(v.pos, 1.0);
 
-    fragColour = v.colour;
+    if(PushConstants.isSelected == true){
+        fragColourTint = vec3(1, 0.6, 0);
+    }
+    else{
+        fragColourTint = vec3(1, 1, 1);
+    }
     fragTexCoord = vec2(v.xUV, v.yUV);
     surfaceNormal = v.normal;
-    Ka = PushConstants.Ka;
-    Kd = PushConstants.Kd;
-    Ks = PushConstants.Ks;
     fragPos = vec3(PushConstants.modelMatrix * vec4(v.pos, 1.0)); //Multiply by model matrix to get in world coords for blinn-phong
 }

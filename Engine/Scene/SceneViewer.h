@@ -7,7 +7,7 @@
 
 #include "../Utils/InputManager.h"
 #include "../Primitives/Empty.h"
-#include "../Primitives/Camera.h"
+#include "../Primitives/Components/Camera.h"
 #include "../../include/imgui/imgui.h"
 
 enum class EViewerState {
@@ -22,7 +22,7 @@ std::string to_string(EViewerState state);
 
 class SceneViewer : IInputResponse, public Empty {
 public:
-    explicit SceneViewer(Scene* s) : Empty(s, { .position = glm::vec3(20, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5) }), ViewerState(EViewerState::VIEWER_EDIT), PreviousState(EViewerState::VIEWER_NOSTATE), camera(this) {};
+    explicit SceneViewer(Scene* s);
 
     //Returns true if state was set successfully
     bool SetState(EViewerState newState);

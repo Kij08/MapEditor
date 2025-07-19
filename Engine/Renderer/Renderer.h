@@ -28,8 +28,8 @@ public:
 	static Renderer& Get();
 
 
-	const uint32_t WIDTH = 1280;
-	const uint32_t HEIGHT = 720;
+	const uint32_t WIDTH = 1920;
+	const uint32_t HEIGHT = 1080;
 
 	void Terminate();
 
@@ -231,9 +231,7 @@ private:
 	struct MeshPushConstant {
 		glm::mat4 modelMatrix;
 		VkDeviceAddress vBufAddress;
-		float Ka;
-		float Kd;
-		float Ks;
+		bool isSelected;
 	};
 
 	void UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex, glm::vec3 cameraDirection, glm::vec3 cameraPosition);

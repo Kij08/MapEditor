@@ -46,8 +46,7 @@ std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath)
 
 	Renderer::Get().DestroyBuffer(stagingBuffer);
 
-	//Update descriptor sets
-
+	tex.SetName(GetNameFromPath(texturePath));
 	return std::make_shared<Texture>(tex);
 
 }
@@ -116,7 +115,7 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 	std::cout << indices.size() << std::endl;
 
 	//Upload mesh to GPU
-	Mesh mesh(Renderer::Get().UploadModel(vertices, indices));
+	Mesh mesh(Renderer::Get().UploadModel(vertices, indices), GetNameFromPath(modelPath));
 	mesh.primitives.push_back(MeshPrimitives{ .startIndex = 0, .count = static_cast<uint32_t>(indices.size())});
 	return std::make_shared<Mesh>(mesh);
 }
@@ -125,9 +124,14 @@ void AssetManager::LoadObject(Object *obj) {
 	std::shared_ptr<Mesh> mesh = LoadMesh(obj->GetModelPath());
 	std::shared_ptr<Texture> texture = LoadTexture(obj->GetTexturePath());
 
-	obj->SetMesh(mesh);
-	obj->SetTexture(texture);
+	obj->GetMeshComponent()->SetMesh(mesh);
+	obj->GetMeshComponent()->SetTexture(texture);
 
 	LoadedMeshes.emplace(obj->GetModelPath(), mesh);
 	LoadedTextures.emplace(obj->GetTexturePath(), texture);
+}
+
+std::string AssetManager::GetNameFromPath(std::string path) {
+	int startPos = path.find_last_of("/");
+	return path.substr(startPos+1, path.find_last_of('.') - startPos-1);
 }

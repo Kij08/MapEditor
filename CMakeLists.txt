@@ -45,5 +45,14 @@ add_executable(MapEditor main.cpp
         Engine/Utils/InputManager.h
         Engine/Primitives/Empty.cpp
         Engine/Primitives/Empty.h
-        Engine/Primitives/Camera.cpp
-        Engine/Primitives/Camera.h)
+        Engine/Primitives/Components/Camera.cpp
+        Engine/Primitives/Components/Camera.h
+        Engine/Primitives/ObjectTypes.h
+        Engine/Primitives/Components/Component.cpp
+        Engine/Primitives/Components/Component.h
+        Engine/Primitives/Components/Collider.cpp
+        Engine/Primitives/Components/Collider.h
+        Engine/Primitives/Components/MeshComponent.cpp
+        Engine/Primitives/Components/MeshComponent.h
+        Engine/Utils/FileManager.cpp
+        Engine/Utils/FileManager.h)

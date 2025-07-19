@@ -21,6 +21,8 @@
 #include "../../include/imgui/imgui_internal.h"
 
 #include "../Scene/Scene.h"
+#include "../Utils/FileManager.h"
+
 
 static Renderer* loadedRenderer;
 
@@ -121,6 +123,7 @@ void Renderer::Startup() {
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_MAXIMIZED, true);
 	//glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	windowRef = glfwCreateWindow(WIDTH, HEIGHT, "Map Editor", nullptr, nullptr);
@@ -1236,7 +1239,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 
 	for (auto const& obj : objects) {
 
-		TextureAllocation objTex = obj.get()->GetTexture()->GetAllocation();
+		TextureAllocation objTex = obj->GetMeshComponent()->GetTexture()->GetAllocation();
 		//Dynamically allocate descriptors for obj textures. Use global set layout
 		VkDescriptorSet imageSet = frames[frameIndex].Descriptors.AllocateDescriptorSet(device, DescriptorSetLayout);
 
@@ -1248,7 +1251,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 
 		vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &imageSet, 0, nullptr);
 
-		vkCmdBindIndexBuffer(CmdBuffer, obj.get()->GetMesh()->GetIndexBuffer().buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(CmdBuffer, obj->GetMeshComponent()->GetMesh()->GetIndexBuffer().buffer, 0, VK_INDEX_TYPE_UINT32);
 
 		//The magic function
 		glm::mat4 modelMatrix(1.f);
@@ -1261,53 +1264,16 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 		//Set up push constants. Model matrix and blinn-hong shading lighting constants
 		MeshPushConstant constant;
 		constant.modelMatrix = modelMatrix;
-		constant.vBufAddress = obj->GetMesh()->GetVertexBufferAddress();
-		constant.Ka = obj->GetKa();
-		constant.Kd = obj->GetKd();
-		constant.Ks = obj->GetKs();
+		constant.vBufAddress = obj->GetMeshComponent()->GetMesh()->GetVertexBufferAddress();
+		constant.isSelected = obj->isSelectedInScene;
 
 		vkCmdPushConstants(CmdBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstant), &constant);
-		vkCmdDrawIndexed(CmdBuffer, obj.get()->GetMesh()->primitives[0].count, 1, 0, 0, 0);
+		vkCmdDrawIndexed(CmdBuffer, obj->GetMeshComponent()->GetMesh()->primitives[0].count, 1, 0, 0, 0);
 	}
 
 	ImGui_ImplVulkan_RenderDrawData(drawData, CmdBuffer);
 
 	vkCmdEndRendering(CmdBuffer);
-
-	//Begin new draw commands for mouse picking
-	if (bShouldPick) {
-		//Info for dynamic rendering
-		std::array<VkClearValue, 1> pickingClearValues{};
-		clearValues[1].depthStencil = { 1.0f, 0 };
-
-		const VkRenderingAttachmentInfoKHR PickingDepthAttachInfo {
-			.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
-			.imageView = PickingDepthTexture.TextureImageView,
-			.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-			.resolveMode = VK_RESOLVE_MODE_NONE,
-			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-			.clearValue = clearValues[1]
-		};
-
-		VkRect2D pickingRenderingArea = {VkOffset2D{}, VkExtent2D{1, 1}};
-
-		const VkRenderingInfoKHR PickingRenderInfo {
-			.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
-			.renderArea = pickingRenderingArea,
-			.layerCount = 1,
-			.colorAttachmentCount = 1,
-			.pDepthAttachment = &PickingDepthAttachInfo
-		};
-
-		///Start Draw
-		vkCmdBeginRendering(CmdBuffer, &PickingRenderInfo);
-
-		VkRect2D pickScissor{};
-		pickScissor.offset = { 0, 0 };
-		pickScissor.extent = {1, 1};
-		vkCmdSetScissor(CmdBuffer, 0, 1, &pickScissor);
-	}
 
 	//Transition colour swapchain images to present bit for optimal rendering
 	const VkImageMemoryBarrier ImgMemBarrierPresentTransition {
@@ -1351,6 +1317,7 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 	ImGui_ImplGlfw_NewFrame();
 
 	ImGui::NewFrame();
+	//ImGui::ShowDemoWindow();
 
 	ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_PassthruCentralNode;
 	ImGuiID dockSpaceID = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), flags);
@@ -1374,7 +1341,9 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 	{
 		if (ImGui::BeginMenu("File"))
 		{
-			if (ImGui::MenuItem("Open..", "Ctrl+O")) { /* Do stuff */ }
+			if (ImGui::MenuItem("Open..", "Ctrl+O")) {
+				FileManager::OpenFileDialog();
+			}
 			if (ImGui::MenuItem("Save", "Ctrl+S"))   { /* Do stuff */ }
 			if (ImGui::MenuItem("Close", "Ctrl+W"))  {  }
 			ImGui::EndMenu();
@@ -1408,7 +1377,7 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 			//There is a new selected node
 			if (selectedNode) {
 				//Check if selected node is not nullptr incase there is no previous selection
-				selectedNode->isSelected = false;
+				selectedNode->thisObject->isSelectedInScene = false;
 			}
 			selectedNode = newNode;
 		}
@@ -1419,8 +1388,10 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 		ImGui::Begin("Object Info Panel");
 		//If there is a selected object show its details
 
-
 		if (selectedNode) {
+
+			ImGui::Text("Object Transform");
+
 			float pos[3] = {selectedNode->thisObject->GetTransform().position.x,
 				selectedNode->thisObject->GetTransform().position.y,
 				selectedNode->thisObject->GetTransform().position.z
@@ -1444,11 +1415,16 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 
 			selectedNode->thisObject->SetTransform(t);
 
+			//Loop through all object components and call their definition of render component UI
+			for (auto c : selectedNode->thisObject->GetComponents()) {
+				c->RenderComponentImGui(s);
+			}
+
 			//If we click in the viewport on nothing then unfocus the object
 			auto io = ImGui::GetIO();
 			if (!io.WantCaptureMouse && io.MouseDown[0]) {
 				//Clear selected node
-				selectedNode->isSelected = false;
+				selectedNode->thisObject->isSelectedInScene = false;
 				selectedNode = nullptr;
 			}
 		}

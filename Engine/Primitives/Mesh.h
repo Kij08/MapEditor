@@ -46,20 +46,20 @@ struct MeshPrimitives {
 
 class Mesh {
 public:
-    Mesh(const MeshBuffers& mBuffer) {
-        buffers = mBuffer;
-    }
+    explicit Mesh(const MeshBuffers& mBuffer) : buffers(mBuffer), MeshName("DefaultMesh") {}
+    Mesh(const MeshBuffers& mBuffer, std::string name) : buffers(mBuffer), MeshName(name) {}
 
     const VkDeviceAddress& GetVertexBufferAddress() { return buffers.vertexBufferAddress; }
     const VmaBuffer& GetIndexBuffer() { return buffers.indexBuffer; }
 
+    //Vector holding all mesh primitives, Mesh will have multiple if it needs more than one material for example
     std::vector<MeshPrimitives> primitives;
 
+    const std::string& GetName() { return MeshName;}
 private:
 
     MeshBuffers buffers;
-
-    //Vector holding all mesh primitives, Mesh will have multiple if it needs more than one material for example
+    std::string MeshName;
 
 
 };

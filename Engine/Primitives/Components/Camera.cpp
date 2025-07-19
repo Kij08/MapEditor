@@ -4,12 +4,9 @@
 
 #include "Camera.h"
 #include <glm/trigonometric.hpp>
-#include "Empty.h"
-#include "../Scene/Scene.h"
+#include "../Empty.h"
+#include "../../Scene/Scene.h"
 
-Camera::Camera(Empty* o) : Owner(o) {
-
-}
 
 void Camera::UpdateMousePos(double xPos, double yPos) {
     float xOffset = -xPos + lastX;
@@ -38,4 +35,8 @@ void Camera::UpdateCamera(double xPos, double yPos) {
     cameraForward.y = glm::sin(glm::radians(yaw)) * glm::cos(glm::radians(pitch));
     cameraForward.z = glm::sin(glm::radians(pitch));
     cameraForward = glm::normalize(cameraForward);
+}
+
+void Camera::RenderComponentImGui(Scene* s) {
+
 }

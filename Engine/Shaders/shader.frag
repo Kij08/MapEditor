@@ -5,10 +5,7 @@ layout(set = 0, binding = 1) uniform sampler2D texSampler;
 layout(location = 0) in vec3 fragColour;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 surfaceNormal;
-layout(location = 3) in float Ka;
-layout(location = 4) in float Kd;
-layout(location = 5) in float Ks;
-layout(location = 6) in vec3 fragPos;
+layout(location = 3) in vec3 fragPos;
 
 
 layout(location = 0) out vec4 outColour;
@@ -35,7 +32,6 @@ void main() {
     float specular = pow(max(dot(NormalisedSF, halfwayDirection), 0.0), 256);
     vec3 specularColour = vec3(255, 255, 255) * specular; //Specular is white
 
-
-    outColour = texture(texSampler, fragTexCoord);
+    outColour = texture(texSampler, fragTexCoord) * vec4(fragColour, 1.0);
     //outColour = outColour * vec4(((Ka * ambientColour) + (Kd * diffuseColour) + (Ks * specularColour)), 1.0);
 }

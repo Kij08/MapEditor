@@ -5,25 +5,23 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-
-
-#include "Mesh.h"
-#include "Texture.h"
-#include "Material.h"
 #include "string"
 #include <memory>
 #include "Empty.h"
+#include "Components/MeshComponent.h"
 
 class Scene;
-
+class MeshComponent;
 
 //Base class for anything that is rendered in the scene
 class Object : public Empty {
 
 protected:
-	std::shared_ptr<Mesh> MeshRef;
-	std::shared_ptr<Texture> TextureRef;
-	std::shared_ptr<Material> MaterialRef;
+	//std::shared_ptr<Mesh> MeshRef;
+	//std::shared_ptr<Texture> TextureRef;
+	//std::shared_ptr<Material> MaterialRef;
+
+	std::unique_ptr<MeshComponent> meshComponent;
 
 	std::string PATH_TO_MODEL = "";
 	std::string PATH_TO_TEXTURE = "";
@@ -34,11 +32,8 @@ protected:
 	float Ks = 0;
 
 public:
-	void SetMesh(std::shared_ptr<Mesh> m) { MeshRef = m; };
-	void SetTexture(std::shared_ptr<Texture> m) { TextureRef = m; };
 
-	Mesh* GetMesh() { return MeshRef.get(); };
-	Texture* GetTexture() { return TextureRef.get(); };
+	MeshComponent* GetMeshComponent() { return meshComponent.get(); };
 
 	std::string GetModelPath() { return PATH_TO_MODEL; };
 	std::string GetTexturePath() { return PATH_TO_TEXTURE; };

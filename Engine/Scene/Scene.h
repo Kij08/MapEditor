@@ -16,7 +16,6 @@ struct SceneNode {
     std::shared_ptr<Empty> thisObject;
 
     bool isRoot = false;
-    bool isSelected = false;
 
     std::string GetObjName() {
         return thisObject->GetDisplayName();
@@ -35,7 +34,7 @@ struct SceneNode {
                 flag = ImGuiTreeNodeFlags_Leaf;
             }
             bool didStyling = false;
-            if (isSelected) {
+            if (thisObject->isSelectedInScene) {
                 ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(200, 50, 50, 255));
                 didStyling = true;
             }
@@ -44,7 +43,7 @@ struct SceneNode {
                 //Store the selected object
                 if (ImGui::IsItemClicked()) {
                     selectedNode = this;
-                    isSelected = true;
+                    thisObject->isSelectedInScene = true;
                 }
                 ImGui::TreePop();
             };
@@ -152,6 +151,7 @@ public:
 
     const std::vector<std::shared_ptr<Object>>& GetObjectList() { return objects; }
     SceneNode* GetSceneRoot() { return &SceneGraphRoot; }
+    AssetManager* GetSceneAssetManager() { return &sceneAssetManager; }
 
     void Tick(float deltaTime);
     float currentDeltaTime = 0;

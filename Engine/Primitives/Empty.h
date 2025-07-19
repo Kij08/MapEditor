@@ -5,16 +5,12 @@
 #ifndef EMPTY_H
 #define EMPTY_H
 
-#include <glm/fwd.hpp>
-#include <glm/vec3.hpp>
+#include <memory>
 #include <string>
+#include <vector>
 
-
-struct Transform {
-    glm::vec3 position;
-    glm::vec3 rotation;
-    glm::vec3 scale;
-};
+#include "ObjectTypes.h"
+#include "Components/Component.h"
 
 class Scene;
 //Base class for anything in the scene
@@ -31,6 +27,8 @@ protected:
     std::string ObjectDisplayName;
     uint32_t objectID;
 
+    //List of registered components on this scene object
+    std::vector<Component*> Components;
 public:
     const Transform GetTransform() { return objTransform; };
     void SetTransform(Transform t) { objTransform = t; };
@@ -39,10 +37,15 @@ public:
 
     std::string GetDisplayName() { return ObjectDisplayName; };
 
+    void AddComponent(Component* c) { Components.push_back(c); };
+    const std::vector<Component*>& GetComponents() { return Components; };
+
     virtual void Tick() {};
     virtual void Begin() {};
 
     virtual ~Empty() = default;
+
+    bool isSelectedInScene = false;
 };
 
 

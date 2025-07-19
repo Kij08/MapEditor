@@ -3,6 +3,7 @@
 //
 
 #include "Object.h"
+#include "Components/MeshComponent.h"
 
 Object::Object(Scene* s) : Empty(s), PATH_TO_MODEL("../DefaultContent/Meshes/CH_Player_Ship.obj"), PATH_TO_TEXTURE("../DefaultContent/Textures/SpaceShip_CLR.png")
 {
@@ -12,6 +13,8 @@ Object::Object(Scene* s) : Empty(s), PATH_TO_MODEL("../DefaultContent/Meshes/CH_
     Ka = 0;
     Kd = 0;
     Ks = 0;
+
+    meshComponent = std::make_unique<MeshComponent>(this);
 }
 
 Object::Object(Scene* s, std::string model, std::string tex) : Empty(s), PATH_TO_MODEL(model), PATH_TO_TEXTURE(tex)
@@ -22,6 +25,8 @@ Object::Object(Scene* s, std::string model, std::string tex) : Empty(s), PATH_TO
     Ka = 0;
     Kd = 0;
     Ks = 0;
+
+    meshComponent = std::make_unique<MeshComponent>(this);
 }
 
 void Object::Tick()
