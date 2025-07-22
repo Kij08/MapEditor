@@ -17,6 +17,12 @@ Object::Object(Scene* s) : Empty(s), PATH_TO_MODEL("../DefaultContent/Meshes/CH_
     meshComponent = std::make_unique<MeshComponent>(this);
 }
 
+Object::Object(Scene *s, std::string name) : Empty(s, name) {
+}
+
+Object::Object(Scene *s, std::string name, Transform t) : Empty(s, name, t) {
+}
+
 Object::Object(Scene* s, std::string model, std::string tex) : Empty(s), PATH_TO_MODEL(model), PATH_TO_TEXTURE(tex)
 {
     Transform t = { .position = glm::vec3(0, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5) };

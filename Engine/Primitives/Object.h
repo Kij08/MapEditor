@@ -45,6 +45,8 @@ public:
 	float GetKs() { return Ks; }
 
 	explicit Object(Scene* s);
+	Object(Scene* s, std::string name);
+	Object(Scene* s, std::string name, Transform t);
 	Object(Scene* s, std::string model, std::string tex);
 
 	bool bIsDirty;

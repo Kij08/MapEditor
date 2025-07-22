@@ -28,7 +28,7 @@ class AssetManager {
     std::string GetNameFromPath(std::string path);
 
 public:
-    AssetManager() {};
+    AssetManager() = default;
 
 
     void LoadObject(class Object* obj);

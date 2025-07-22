@@ -15,3 +15,11 @@ Empty::Empty(Scene* s, Transform t) : SceneRef(s),
     objTransform(t), objectID(s->GetObjectList().size()), ObjectDisplayName("Object" + std::to_string(s->GetObjectList().size())) {
 
 }
+
+Empty::Empty(Scene *s, const std::string& name) : SceneRef(s),
+        objTransform({glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f)}), ObjectDisplayName(name){
+}
+
+Empty::Empty(Scene *s, const std::string& name, Transform t) : SceneRef(s),
+        objTransform(t), ObjectDisplayName(name) {
+}

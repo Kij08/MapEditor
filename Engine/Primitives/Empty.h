@@ -20,6 +20,8 @@ public:
     explicit Empty(Scene* s);
 
     Empty(Scene* s, Transform t);
+    Empty(Scene* s, const std::string& name);
+    Empty(Scene* s, const std::string& name, Transform t);
 protected:
     Transform objTransform;
     Scene* SceneRef;

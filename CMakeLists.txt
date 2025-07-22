@@ -55,4 +55,5 @@ add_executable(MapEditor main.cpp
         Engine/Primitives/Components/MeshComponent.cpp
         Engine/Primitives/Components/MeshComponent.h
         Engine/Utils/FileManager.cpp
-        Engine/Utils/FileManager.h)
+        Engine/Utils/FileManager.h
+        Engine/Utils/EngineUI.h)

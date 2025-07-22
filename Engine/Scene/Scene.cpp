@@ -11,7 +11,6 @@ Scene::Scene() : sceneViewer(this) {
 
 void Scene::InitScene() {
     sceneViewer.Begin();
-    CreateObject<Object>();
 }
 
 void Scene::Tick(float deltaTime) {

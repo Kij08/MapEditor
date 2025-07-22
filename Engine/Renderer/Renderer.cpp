@@ -16,13 +16,9 @@
 #define VMA_IMPLEMENTATION
 #include "../../include/vk_mem_alloc.h"
 
-#include "../../include/imgui/imgui_impl_glfw.h"
-#include "../../include/imgui/imgui_impl_vulkan.h"
-#include "../../include/imgui/imgui_internal.h"
-
 #include "../Scene/Scene.h"
 #include "../Utils/FileManager.h"
-
+#include "../Utils/EngineUI.h"
 
 static Renderer* loadedRenderer;
 
@@ -1311,6 +1307,10 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 
 ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 	static SceneNode* selectedNode = nullptr;
+	static bool bIsMapLoaded = false;
+
+	//Flags to hold the display state of each ui window
+	static EngineUI::WindowDisplayBit displayFlags;
 
 	// Start the Dear ImGui frame
 	ImGui_ImplVulkan_NewFrame();
@@ -1319,127 +1319,33 @@ ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
 	ImGui::NewFrame();
 	//ImGui::ShowDemoWindow();
 
+	//Create dockspace
 	ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_PassthruCentralNode;
 	ImGuiID dockSpaceID = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), flags);
 
-	//Set button pos to always be in the top left of the centre viewport
-	ImVec2 centrePos = ImGui::DockBuilderGetCentralNode(dockSpaceID)->Pos;
-	ImGui::SetNextWindowPos(centrePos, ImGuiCond_Always);
-	ImGuiWindowFlags mainViewportBarFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize;
-	if (ImGui::Begin("ViewportButtons", 0, mainViewportBarFlags)) {
-		if (ImGui::Button(to_string(s->GetViewer()->GetState()).c_str(), ImVec2(80, 20))) {
-			s->GetViewer()->EnumerateState();
-		}
-		ImGui::End();
+
+	if (!bIsMapLoaded) {
+		EngineUI::StartupMenu(bIsMapLoaded, s);
 	}
 
-	static bool bShowDetailsPanel = true;
-	static bool bShowSpawnPanel = true;
-	static bool bShowSceneTreePanel = true;
+	EngineUI::MainMenuBar(bIsMapLoaded, s, displayFlags);
+	EngineUI::ViewportButtons(dockSpaceID, s);
 
-	if (ImGui::BeginMainMenuBar())
-	{
-		if (ImGui::BeginMenu("File"))
-		{
-			if (ImGui::MenuItem("Open..", "Ctrl+O")) {
-				FileManager::OpenFileDialog();
-			}
-			if (ImGui::MenuItem("Save", "Ctrl+S"))   { /* Do stuff */ }
-			if (ImGui::MenuItem("Close", "Ctrl+W"))  {  }
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("Edit"))
-		{
-			if (ImGui::MenuItem("Settings")) { /* Do stuff */ }
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("Windows"))
-		{
-			if (ImGui::MenuItem("Details Panel")) {
-				bShowDetailsPanel = !bShowDetailsPanel;
-			}
-			if (ImGui::MenuItem("Spawn Panel")) {
-				bShowSpawnPanel = !bShowSpawnPanel;
-			}
-			if (ImGui::MenuItem("Scene Tree Panel")) {
-				bShowSceneTreePanel = !bShowSceneTreePanel;
-			}
-			ImGui::EndMenu();
-		}
-		ImGui::EndMainMenuBar();
+
+	if (displayFlags.HasFlag(EngineUI::WindowDisplayFlagValues::ShowSceneTree)) {
+		EngineUI::SceneTreePanel(selectedNode, s);
 	}
 
-	if (bShowSceneTreePanel) {
-		ImGui::Begin("Scene Tree");
-		//Begin recursive tree render
-		SceneNode* newNode = s->GetSceneRoot()->AddUITreeNode();
-		if (newNode != nullptr) {
-			//There is a new selected node
-			if (selectedNode) {
-				//Check if selected node is not nullptr incase there is no previous selection
-				selectedNode->thisObject->isSelectedInScene = false;
-			}
-			selectedNode = newNode;
-		}
-		ImGui::End();
+	if (displayFlags.HasFlag(EngineUI::WindowDisplayFlagValues::ShowDetails)) {
+		EngineUI::DetailsPanel(selectedNode, s);
 	}
 
-	if (bShowDetailsPanel) {
-		ImGui::Begin("Object Info Panel");
-		//If there is a selected object show its details
-
-		if (selectedNode) {
-
-			ImGui::Text("Object Transform");
-
-			float pos[3] = {selectedNode->thisObject->GetTransform().position.x,
-				selectedNode->thisObject->GetTransform().position.y,
-				selectedNode->thisObject->GetTransform().position.z
-			};
-
-			float rot[3] = {selectedNode->thisObject->GetTransform().rotation.x,
-				selectedNode->thisObject->GetTransform().rotation.y,
-				selectedNode->thisObject->GetTransform().rotation.z
-			};
-
-			float scale[3] = {selectedNode->thisObject->GetTransform().scale.x,
-				selectedNode->thisObject->GetTransform().scale.y,
-				selectedNode->thisObject->GetTransform().scale.z
-			};
-
-			ImGui::InputFloat3("Position", pos);
-			ImGui::InputFloat3("Rotation", rot);
-			ImGui::InputFloat3("Scale", scale);
-
-			Transform t = {glm::vec3{pos[0], pos[1], pos[2]}, glm::vec3{rot[0], rot[1], rot[2]}, glm::vec3{scale[0], scale[1], scale[2]}};
-
-			selectedNode->thisObject->SetTransform(t);
-
-			//Loop through all object components and call their definition of render component UI
-			for (auto c : selectedNode->thisObject->GetComponents()) {
-				c->RenderComponentImGui(s);
-			}
-
-			//If we click in the viewport on nothing then unfocus the object
-			auto io = ImGui::GetIO();
-			if (!io.WantCaptureMouse && io.MouseDown[0]) {
-				//Clear selected node
-				selectedNode->thisObject->isSelectedInScene = false;
-				selectedNode = nullptr;
-			}
-		}
-		ImGui::End();
+	if (displayFlags.HasFlag(EngineUI::WindowDisplayFlagValues::ShowSpawn)) {
+		EngineUI::SpawnPanel(bIsMapLoaded, s);
 	}
 
-	if (bShowSpawnPanel) {
-		ImGui::Begin("Spawn Panel");
-		if (ImGui::Button("Spawn Spaceship")) {
-			s->CreateObject<Object>();
-		}
-		if (ImGui::Button("Spawn small asteroid")) {
-			s->CreateObject<Object>("../DefaultContent/Meshes/SM_Asteroid_SML_A.obj", "../DefaultContent/Textures/Asteroid_SML_CLR.png");
-		}
-		ImGui::End();
+	if (displayFlags.HasFlag(EngineUI::WindowDisplayFlagValues::ShowFileExplorer)) {
+		EngineUI::FileExplorer();
 	}
 
 	ImGui::Render();

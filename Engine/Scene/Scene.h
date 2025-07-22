@@ -8,6 +8,7 @@
 #include <vector>
 #include "../Utils/AssetLoader.h"
 #include "SceneViewer.h"
+#include "../Primitives/Object.h"
 
 struct SceneNode {
     SceneNode* parent;
@@ -121,6 +122,23 @@ public:
 
         //Setup code for all objects
         std::shared_ptr<TObject> obj = std::make_shared<TObject>(this);
+        objects.push_back(obj);
+
+        //Allocated memory gets stored and deleted when the scene is deleted
+        SceneNode* node = new SceneNode(obj, &SceneGraphRoot);
+        SceneGraphRoot.AddChild(node);
+
+        sceneAssetManager.LoadObject(obj.get());
+        obj->Begin();
+        return obj;
+    }
+
+    template<class TObject>
+    std::shared_ptr<TObject> CreateObject(std::string name) {
+        static_assert(std::is_base_of<Empty, TObject>::value, "Not an object");
+
+        //Setup code for all objects
+        std::shared_ptr<TObject> obj = std::make_shared<TObject>(this, name);
         objects.push_back(obj);
 
         //Allocated memory gets stored and deleted when the scene is deleted
