@@ -14,12 +14,22 @@
 #include "../Scene/Scene.h"
 
 namespace EngineUI {
-
+    struct UITexture {
+        std::shared_ptr<Texture> texture; //ptr to texture information
+        VkDescriptorSet DS; //The field that ImGui uses in their backend to keep track of images
+    };
     inline AssetManager UIAssets;
-
+    inline UITexture folderIcon;
+    inline UITexture meshIcon;
+    inline UITexture imageIcon;
     //Call once to load UI textures
     inline void LoadUIAssets() {
-
+        folderIcon.texture = UIAssets.LoadTexture("../Engine/EngineContent/Icons/open-folder.png", ETextureType::UITexture);
+        folderIcon.DS = ImGui_ImplVulkan_AddTexture(folderIcon.texture->GetAllocation().TextureSampler, folderIcon.texture->GetAllocation().TextureImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        meshIcon.texture = UIAssets.LoadTexture("../Engine/EngineContent/Icons/cube.png", ETextureType::UITexture);
+        meshIcon.DS = ImGui_ImplVulkan_AddTexture(meshIcon.texture->GetAllocation().TextureSampler, meshIcon.texture->GetAllocation().TextureImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        imageIcon.texture = UIAssets.LoadTexture("../Engine/EngineContent/Icons/files.png", ETextureType::UITexture);
+        imageIcon.DS = ImGui_ImplVulkan_AddTexture(imageIcon.texture->GetAllocation().TextureSampler, imageIcon.texture->GetAllocation().TextureImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
     //Flags representing whether to show a certain window in the ui dock space or not
@@ -48,7 +58,7 @@ namespace EngineUI {
 
     //Define create new map popup modal
     //Must be defined wherever you want to call open modal due to ImGui stack restriction
-    inline void CreateMapModal() {
+    inline void CreateMapModal(bool& bIsMapLoaded, Scene*& s) {
         if (ImGui::BeginPopupModal("New Map Creation", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
             ImGui::Text("New Map Creation");
             static std::string mapName;
@@ -78,7 +88,7 @@ namespace EngineUI {
                 //Only create a map if the name and path are valid
                 if (mapName.empty() == false && FileManager::ValidateFilePath(mapPath)) {
                     ImGui::CloseCurrentPopup();
-                    FileManager::CreateNewMap(mapPath, mapName);
+                    bIsMapLoaded = FileManager::CreateNewMap(mapPath, mapName, s);
                 }
             }
 
@@ -86,7 +96,7 @@ namespace EngineUI {
         }
     }
 
-    inline void StartupMenu(bool& bIsMapLoaded, Scene* s) {
+    inline void StartupMenu(bool& bIsMapLoaded, Scene*& s) {
         ImGuiWindowFlags MapActionFlags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove;
         ImVec2 centre = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(centre, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -100,7 +110,7 @@ namespace EngineUI {
                 bIsMapLoaded = FileManager::OpenMapFile(s);
             }
 
-            CreateMapModal();
+            CreateMapModal(bIsMapLoaded, s);
 
             ImGui::End();
         }
@@ -132,7 +142,7 @@ namespace EngineUI {
                 }
                 if (ImGui::MenuItem("Open..", "Ctrl+O")) {
                     bIsMapLoaded = FileManager::OpenMapFile(s);
-                    CreateMapModal();
+                    CreateMapModal(bIsMapLoaded, s);
                 }
                 if (ImGui::MenuItem("Save", "Ctrl+S"))   { /* Do stuff */ }
                 if (ImGui::MenuItem("Close", "Ctrl+W"))  {  }
@@ -163,7 +173,7 @@ namespace EngineUI {
         }
     }
 
-    inline void SceneTreePanel(SceneNode* selectedNode, Scene* s) {
+    inline void SceneTreePanel(SceneNode*& selectedNode, Scene* s) {
         ImGui::Begin("Scene Tree");
         //Begin recursive tree render
         SceneNode* newNode = s->GetSceneRoot()->AddUITreeNode();
@@ -179,7 +189,7 @@ namespace EngineUI {
     }
 
     //Show details panel for selected object
-    inline void DetailsPanel(SceneNode* selectedNode, Scene* s) {
+    inline void DetailsPanel(SceneNode*& selectedNode, Scene* s) {
         ImGui::Begin("Object Info Panel");
         //If there is a selected object show its details
 
@@ -239,12 +249,73 @@ namespace EngineUI {
         ImGui::End();
     }
 
-    inline void FileExplorer() {
+    inline void FileExplorer(Scene* s) {
         ImGui::Begin("File Explorer");
 
+        for (auto& file : FileManager::DirectoryFiles) {
+            if (file.extension() == ".obj") {
+                ImGui::Image(meshIcon.DS, ImVec2(100, 100));
+            }
+            else if (file.extension() == ".png") {
+                ImGui::Image(imageIcon.DS, ImVec2(100, 100));
+            }
+            else {
+                ImGui::Image(folderIcon.DS, ImVec2(100, 100));
+            }
+            ImGui::SameLine();
+        }
 
 
         ImGui::End();
+    }
+
+
+    //Main function to render editor ui elements
+    inline ImDrawData* RenderImGuiElements(Scene*& s) {
+        static SceneNode* selectedNode = nullptr;
+        static bool bIsMapLoaded = false;
+
+        //Flags to hold the display state of each ui window
+        static WindowDisplayBit displayFlags;
+
+        // Start the Dear ImGui frame
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+
+        ImGui::NewFrame();
+        //ImGui::ShowDemoWindow();
+
+        //Create dockspace
+        ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_PassthruCentralNode;
+        ImGuiID dockSpaceID = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), flags);
+
+
+        if (!bIsMapLoaded) {
+            StartupMenu(bIsMapLoaded, s);
+        }
+
+        MainMenuBar(bIsMapLoaded, s, displayFlags);
+        ViewportButtons(dockSpaceID, s);
+
+
+        if (displayFlags.HasFlag(WindowDisplayFlagValues::ShowSceneTree)) {
+            SceneTreePanel(selectedNode, s);
+        }
+
+        if (displayFlags.HasFlag(WindowDisplayFlagValues::ShowDetails)) {
+            DetailsPanel(selectedNode, s);
+        }
+
+        if (displayFlags.HasFlag(WindowDisplayFlagValues::ShowSpawn)) {
+            SpawnPanel(bIsMapLoaded, s);
+        }
+
+        if (displayFlags.HasFlag(WindowDisplayFlagValues::ShowFileExplorer)) {
+            FileExplorer(s);
+        }
+
+        ImGui::Render();
+        return ImGui::GetDrawData();
     }
 }
 

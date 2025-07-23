@@ -33,10 +33,17 @@ namespace InputManager {
 class IInputResponse {
 public:
     virtual ~IInputResponse() {
-        for (int i : CallbackIndices) {
-            //InputManager::inputCallbacks[i];
+        //Delete this objects callbacks from inputCallbacks array
+
+        std::vector<InputCallback> newCallbacks;
+        for (int i = 0; i < InputManager::inputCallbacks.size(); i++) {
+            if (CallbackIndices[i] != i) {
+                newCallbacks.push_back(InputManager::inputCallbacks[i]);
+            }
         }
-    }; //TODO: Delete callbacks and resize array
+
+        InputManager::inputCallbacks = newCallbacks;
+    };
     virtual void RespondToMouseButton(GLFWwindow* window, int button, int action, int mods) = 0;
     virtual void RespondToKey(GLFWwindow* window, int key, int scancode, int action, int mods) = 0;
     virtual void RespondToCursor(GLFWwindow* window, double xPos, double yPos) = 0;

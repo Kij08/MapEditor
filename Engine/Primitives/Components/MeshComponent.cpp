@@ -9,6 +9,10 @@
 
 #include "../../Scene/Scene.h"
 
+MeshComponent::MeshComponent(class Empty *o, std::string modelPath, std::string texPath) : Component(o), pathToModel(modelPath), pathToTexture(texPath) {
+    Owner->GetLevel()->GetSceneAssetManager()->LoadMeshComponent(this);
+}
+
 void MeshComponent::RenderComponentImGui(Scene* s) {
     ImGui::Text("Mesh Component");
 

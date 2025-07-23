@@ -23,6 +23,7 @@ std::string to_string(EViewerState state);
 class SceneViewer : IInputResponse, public Empty {
 public:
     explicit SceneViewer(Scene* s);
+    ~SceneViewer();
 
     //Returns true if state was set successfully
     bool SetState(EViewerState newState);
@@ -51,7 +52,7 @@ private:
 
     //Movement values
     const float scrollStep = 5.f;
-    const float moveSpeed = 300.f;
+    const float moveSpeed = 600.f;
     const float scrollMoveDistance = 50.f;
     glm::vec3 moveVector = glm::vec3(0.0f, 0.0f, 0.0f);
 

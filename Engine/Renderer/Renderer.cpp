@@ -78,10 +78,12 @@ void Renderer::Terminate()
 
 	vkDestroySampler(device, TextureSampler, nullptr);
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-
+		frames[i].Descriptors.DestroyPools(device);
+		vmaDestroyBuffer(vmaAllocator, frames[i].UniformBuffer.buffer, frames[i].UniformBuffer.allocation);
 	}
 
-	vkDestroyDescriptorPool(device, DescriptorPool, nullptr);
+	UIDescriptors.DestroyPool(device);
+	vkDestroyDescriptorSetLayout(device, UIDescriptorSetLayout, nullptr);
 	vkDestroyDescriptorSetLayout(device, DescriptorSetLayout, nullptr);
 
 	vkDestroyCommandPool(device, CommandPool, nullptr);
@@ -149,6 +151,7 @@ void Renderer::Startup() {
 	InitDescriptors();
 	CreateGraphicsPipeline();
 	CreateDepthResources();
+	CreateUIDescriptors();
 
 	ImGui_ImplGlfw_InitForVulkan(GetWindow(), true);
 	ImGui_ImplVulkan_InitInfo init_info = {};
@@ -158,7 +161,7 @@ void Renderer::Startup() {
 	init_info.Device = device;
 	init_info.QueueFamily = swapChainSupportValues.queueFamily;
 	init_info.Queue = swapChainSupportValues.queue;
-	init_info.DescriptorPoolSize = 10;
+	init_info.DescriptorPool = UIDescriptors.GetPool();
 	init_info.UseDynamicRendering = true;
 	init_info.PipelineRenderingCreateInfo = swapChainSupportValues.createInfo;
 	init_info.MinImageCount = swapChainSupportValues.imageCount;
@@ -170,8 +173,6 @@ void Renderer::Startup() {
 	CreateCommandPool();
 	CreateTextureSampler();
 	CreateUniformBuffer();
-	CreateDescriptorPool();
-	CreateDescriptorSets();
 	CreateCommandBuffers();
 	CreateSyncObjects();
 }
@@ -1227,10 +1228,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 
 	//Bind lit pipeline
 	vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GraphicsPipeline);
-
-	//Make vertex buffer big and put all object verts in there, if it ever gets too small double its size using the same createVertexBuffer() workflow
-	//Need to store the offsets for each object, be able to remove and add objects to vert and index array
-	//UpdateUniformBuffer(currentFrame, obj->GetTransform().position, obj->GetTransform().rotation, obj->GetTransform().scale);
 	frames[frameIndex].Descriptors.ClearDescriptors(device);
 
 	for (auto const& obj : objects) {
@@ -1303,53 +1300,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageInde
 	if (vkEndCommandBuffer(CmdBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("Could not record command buffer!");
 	}
-}
-
-ImDrawData* Renderer::RenderImGUIElements(Scene* s) {
-	static SceneNode* selectedNode = nullptr;
-	static bool bIsMapLoaded = false;
-
-	//Flags to hold the display state of each ui window
-	static EngineUI::WindowDisplayBit displayFlags;
-
-	// Start the Dear ImGui frame
-	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-
-	ImGui::NewFrame();
-	//ImGui::ShowDemoWindow();
-
-	//Create dockspace
-	ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_PassthruCentralNode;
-	ImGuiID dockSpaceID = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), flags);
-
-
-	if (!bIsMapLoaded) {
-		EngineUI::StartupMenu(bIsMapLoaded, s);
-	}
-
-	EngineUI::MainMenuBar(bIsMapLoaded, s, displayFlags);
-	EngineUI::ViewportButtons(dockSpaceID, s);
-
-
-	if (displayFlags.HasFlag(EngineUI::WindowDisplayFlagValues::ShowSceneTree)) {
-		EngineUI::SceneTreePanel(selectedNode, s);
-	}
-
-	if (displayFlags.HasFlag(EngineUI::WindowDisplayFlagValues::ShowDetails)) {
-		EngineUI::DetailsPanel(selectedNode, s);
-	}
-
-	if (displayFlags.HasFlag(EngineUI::WindowDisplayFlagValues::ShowSpawn)) {
-		EngineUI::SpawnPanel(bIsMapLoaded, s);
-	}
-
-	if (displayFlags.HasFlag(EngineUI::WindowDisplayFlagValues::ShowFileExplorer)) {
-		EngineUI::FileExplorer();
-	}
-
-	ImGui::Render();
-	return ImGui::GetDrawData();
 }
 
 void Renderer::CreateSyncObjects()
@@ -1468,7 +1418,7 @@ void Renderer::InitDescriptors() {
 
 	//Init initial descriptor pool for each frame
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		// create a descriptor pool
+		// create a descriptor pool with 1000 max sets, each containing 3 uniform buffers and 4 image samplers
 		std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
 			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 },
@@ -1508,51 +1458,37 @@ void Renderer::CreateDescriptorSetLayout()
 	}
 }
 
-void Renderer::CreateDescriptorPool()
-{
-	std::array<VkDescriptorPoolSize, 2> poolSizes{};
-	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 6 * 2);
-	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 6 * 2);
+void Renderer::CreateUIDescriptors() {
+	//UI descriptor layouts
+	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+	samplerLayoutBinding.binding = 0;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-	VkDescriptorPoolCreateInfo poolInfo{};
-	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 6 * 2);
+	VkDescriptorSetLayoutCreateInfo layoutInfo{};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = &samplerLayoutBinding;
 
 
-	if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &DescriptorPool) != VK_SUCCESS) {
-		throw std::runtime_error("Could not create descriptor pool!");
+	if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &UIDescriptorSetLayout) != VK_SUCCESS) {
+		throw std::runtime_error("Could not create descriptor set layout!");
 	}
+
+	//The ui descriptors need imgui min # of image sampler per set
+	std::vector<DescriptorAllocator::PoolSizeRatio> frame_sizes = {
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE }
+	};
+
+	//Creates a descriptor pool that can hold 100 sets each with imgui min # of image samplers
+	UIDescriptors.InitPool(device, 100, frame_sizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
+
 }
 
-void Renderer::CreateDescriptorSets() //Each object probably needs a descriptor set. Each object needs its own UBO. Each frame in flight needs its own set of all of these
-{ //You can do both: put the camera view and projection matrices in a uniform buffer and use a push constant for the per model matrices.
+VkDescriptorSet Renderer::AllocateUITextureDescriptor() {
 
+	return 0; //UIDescriptors.AllocateDescriptorSet(device, );
 
-  //Try to make 4 descriptor sets: 1 for each texture, use push constants to change the model matrix
-
-
-	std::vector<VkDescriptorSetLayout> layouts(static_cast<uint32_t>(6 * 2), DescriptorSetLayout);
-
-	VkDescriptorSetAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = DescriptorPool;
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(6 * 2);
-	allocInfo.pSetLayouts = layouts.data();
-
-	DescriptorSets.resize(MAX_FRAMES_IN_FLIGHT); //Resize frames in flight size to max frames in flight
-
-	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		DescriptorSets[i].resize(6 * 2); //resize obj spaces for max frame in flight * max number of objects I have in scene + 1 * double
-
-		if (vkAllocateDescriptorSets(device, &allocInfo, DescriptorSets[i].data()) != VK_SUCCESS) {
-			std::cout << "Couldnt allocate sets";
-			throw std::runtime_error("Could not allocate descriptor sets!");
-		}
-	}
 }
 
 void Renderer::UpdateUniformBuffer(VkCommandBuffer CmdBuf, int frameIndex, glm::vec3 cameraDirection, glm::vec3 cameraPosition)
@@ -1668,7 +1604,7 @@ Texture Renderer::CreateImage(uint32_t width, uint32_t height, VkFormat format, 
 	}
 
 	TexAlloc.TextureImageView = CreateImageView(TexAlloc.TextureImage, format, aspectFlag);
-
+	TexAlloc.TextureSampler = TextureSampler;
 	Texture Tex(TexAlloc);
 	return Tex;
 }

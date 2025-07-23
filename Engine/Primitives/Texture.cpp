@@ -3,3 +3,8 @@
 //
 
 #include "Texture.h"
+#include "../Utils/FileManager.h"
+
+Texture::~Texture() {
+    FileManager::WriteStringToLog("Destroying texture: " + TextureName);
+}

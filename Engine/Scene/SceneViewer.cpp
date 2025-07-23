@@ -10,6 +10,7 @@
 #include <glm/gtc/constants.hpp>
 
 #include "Scene.h"
+#include "../Utils/FileManager.h"
 
 std::string to_string(EViewerState state) {
     switch (state) {
@@ -29,6 +30,7 @@ std::string to_string(EViewerState state) {
 SceneViewer::SceneViewer(Scene *s) :
     Empty(s, { .position = glm::vec3(20, 0, 0), .rotation = glm::vec3(0, 0, 0), .scale = glm::vec3(0.5, 0.5, 0.5) }),
     ViewerState(EViewerState::VIEWER_EDIT), PreviousState(EViewerState::VIEWER_EDIT), camera(this) {
+    FileManager::WriteStringToLog("Create Scene Viewer");
 }
 
 bool SceneViewer::SetState(EViewerState newState) {
@@ -75,6 +77,7 @@ void SceneViewer::RespondToMouseButton(GLFWwindow* window, int button, int actio
             else if (action == GLFW_RELEASE) {
                 //When moving is finished return to previous state and reset cursor lock
                 if (SetState(PreviousState)) {
+                    std::cout << "End Move Mode" << std::endl;
                     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
                 }
             }
@@ -157,7 +160,7 @@ void SceneViewer::RespondToKey(GLFWwindow *window, int key, int scancode, int ac
                     break;
                 case GLFW_KEY_E:
                     break;
-                case GLFW_KEY_Q:
+                case GLFW_KEY_R:
                     break;
             }
         }
@@ -206,10 +209,14 @@ void SceneViewer::Begin() {
     RegisterKeyCallback(this, GLFW_KEY_S);
     RegisterKeyCallback(this, GLFW_KEY_D);
     RegisterKeyCallback(this, GLFW_KEY_E);
-    RegisterKeyCallback(this, GLFW_KEY_Q);
+    RegisterKeyCallback(this, GLFW_KEY_R);
 }
 
 void SceneViewer::Tick() {
     Empty::Tick();
     AddMoveVector();
+}
+
+SceneViewer::~SceneViewer() {
+    FileManager::WriteStringToLog("Destroying SceneViewer");
 }

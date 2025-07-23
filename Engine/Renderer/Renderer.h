@@ -179,9 +179,7 @@ private:
 	void CreateCommandBuffers();
 	void RecordCommandBuffer(VkCommandBuffer CmdBuffer, uint32_t imageIndex, int frameIndex, const std::vector<std::shared_ptr<Object>>& objects, ImDrawData* drawData,
 		glm::vec3 cameraDirection, glm::vec3 cameraPosition);
-public:
-	ImDrawData* RenderImGUIElements(Scene* s); //Function that contains ImGUI logic
-private:
+
 	//Starts vulkan GPU commands and returns the command buffer
 	VkCommandBuffer BeginSingleTimeCommands();
 
@@ -210,17 +208,16 @@ public:
 private:
 	//Descriptor Set
 	VkDescriptorSetLayout DescriptorSetLayout;
-	VkDescriptorPool DescriptorPool;
-	std::vector<std::vector<VkDescriptorSet>> DescriptorSets; //Vector of vectors for obj descriptor sets. Each frame in flight has a sometimes differing set of the obj sets
+	VkDescriptorSetLayout UIDescriptorSetLayout;
 
 	void InitDescriptors();
 
 	void CreateDescriptorSetLayout();
-	void CreateDescriptorPool();
-	void CreateDescriptorSets();
+	void CreateUIDescriptors();
+	DescriptorAllocator UIDescriptors;
 
 public:
-	void UpdateDescriptorSets(int objTextureIndex);
+	VkDescriptorSet AllocateUITextureDescriptor();
 private:
 	//UBO
 	struct UniformBufferObject {

@@ -23,9 +23,6 @@ protected:
 
 	std::unique_ptr<MeshComponent> meshComponent;
 
-	std::string PATH_TO_MODEL = "";
-	std::string PATH_TO_TEXTURE = "";
-
 	//TODO: move to Material
 	float Ka = 0;
 	float Kd = 0;
@@ -34,10 +31,6 @@ protected:
 public:
 
 	MeshComponent* GetMeshComponent() { return meshComponent.get(); };
-
-	std::string GetModelPath() { return PATH_TO_MODEL; };
-	std::string GetTexturePath() { return PATH_TO_TEXTURE; };
-
 
 
 	float GetKa() const { return Ka; }
@@ -48,11 +41,13 @@ public:
 	Object(Scene* s, std::string name);
 	Object(Scene* s, std::string name, Transform t);
 	Object(Scene* s, std::string model, std::string tex);
+	Object(Scene* s, Transform t, const MeshComponentDefinition& mc);
 
 	bool bIsDirty;
 
 	void Tick() override;
 	void Begin() override;
+	ObjectDefinition GetObjectDefinition() override;
 };
 
 

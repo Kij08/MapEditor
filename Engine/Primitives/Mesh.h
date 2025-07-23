@@ -48,6 +48,7 @@ class Mesh {
 public:
     explicit Mesh(const MeshBuffers& mBuffer) : buffers(mBuffer), MeshName("DefaultMesh") {}
     Mesh(const MeshBuffers& mBuffer, std::string name) : buffers(mBuffer), MeshName(name) {}
+    ~Mesh();
 
     const VkDeviceAddress& GetVertexBufferAddress() { return buffers.vertexBufferAddress; }
     const VmaBuffer& GetIndexBuffer() { return buffers.indexBuffer; }

@@ -14,13 +14,28 @@ struct Transform {
     glm::vec3 position;
     glm::vec3 rotation;
     glm::vec3 scale;
+
+    //Transforms a comma seperated transform string into a Transform type
+    static Transform StringToTransform(std::string s) {
+        int transformValues[9];
+        for (int i = 0; i < 9; i++) {
+            size_t bitEndPos = s.find_first_of(',');
+            std::string transformBit = s.substr(0, bitEndPos);
+            s = s.substr(bitEndPos + 1);
+
+            transformValues[i] = std::stoi(transformBit);
+        }
+        return {.position = {transformValues[0], transformValues[1], transformValues[2]},
+        .rotation = {transformValues[3], transformValues[4], transformValues[5]},
+        .scale = {transformValues[6], transformValues[7], transformValues[8]}};
+    }
 };
 
 //Definitions for reading objects and components from files
 struct BaseComponentDefinition {
     std::string componentName;
     std::string className;
-    Transform transform = {};
+    Transform componentTransform = {};
     virtual ~BaseComponentDefinition() = default;
 };
 
@@ -36,7 +51,7 @@ struct ObjectDefinition {
     Transform transform = {};
 
     //list of component definitions
-    std::vector<BaseComponentDefinition> ComponentDefinitions;
+    std::vector<BaseComponentDefinition*> ComponentDefinitions;
 };
 
 

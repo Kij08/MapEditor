@@ -23,6 +23,8 @@ public:
 
     Texture(const TextureAllocation& tAlloc, std::string name) : Allocation(tAlloc), TextureName(name) {}
 
+    ~Texture();
+
     TextureAllocation& GetAllocation() { return Allocation; }
     std::string GetName() { return TextureName; }
     void SetName(std::string name) { TextureName = name; }

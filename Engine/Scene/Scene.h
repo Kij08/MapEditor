@@ -110,8 +110,11 @@ protected:
 private:
     SceneNode SceneGraphRoot;
 
+    void AddDefinedObjectToScene(const ObjectDefinition& objectDef);
+
 public:
     Scene();
+    explicit Scene(const std::vector<ObjectDefinition>& objectDefinitions);
     ~Scene();
 
     void InitScene();
@@ -128,7 +131,6 @@ public:
         SceneNode* node = new SceneNode(obj, &SceneGraphRoot);
         SceneGraphRoot.AddChild(node);
 
-        sceneAssetManager.LoadObject(obj.get());
         obj->Begin();
         return obj;
     }
@@ -145,7 +147,6 @@ public:
         SceneNode* node = new SceneNode(obj, &SceneGraphRoot);
         SceneGraphRoot.AddChild(node);
 
-        sceneAssetManager.LoadObject(obj.get());
         obj->Begin();
         return obj;
     }
@@ -162,7 +163,22 @@ public:
         SceneNode* node = new SceneNode(obj, &SceneGraphRoot);
         SceneGraphRoot.AddChild(node);
 
-        sceneAssetManager.LoadObject(obj.get());
+        obj->Begin();
+        return obj;
+    }
+
+    template<class TObject>
+    std::shared_ptr<TObject> CreateObject(std::string name, Transform t, const MeshComponentDefinition& mc) {
+        static_assert(std::is_base_of<Empty, TObject>::value, "Not an Object");
+
+        //Setup code for all objects
+        std::shared_ptr<TObject> obj = std::make_shared<TObject>(this, t, mc);
+        objects.push_back(obj);
+
+        //Allocated memory gets stored and deleted when the scene is deleted
+        SceneNode* node = new SceneNode(obj, &SceneGraphRoot);
+        SceneGraphRoot.AddChild(node);
+
         obj->Begin();
         return obj;
     }

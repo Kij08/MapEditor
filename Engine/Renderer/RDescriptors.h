@@ -28,9 +28,10 @@ struct DescriptorAllocator {
     VkDescriptorPool pool;
 
     //Max sets is how many descriptor sets can be allocated from this pool.
-    void InitPool(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios);
+    void InitPool(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios, VkDescriptorPoolCreateFlags flags = 0);
     void ClearDescriptors(VkDevice device);
     void DestroyPool(VkDevice device);
+    VkDescriptorPool GetPool() { return pool; }
 
     //Allocates set from pool
     VkDescriptorSet AllocateDescriptorSet(VkDevice device, VkDescriptorSetLayout layout);

@@ -45,6 +45,8 @@ public:
     virtual void Tick() {};
     virtual void Begin() {};
 
+    virtual ObjectDefinition GetObjectDefinition() { return ObjectDefinition{}; }
+
     virtual ~Empty() = default;
 
     bool isSelectedInScene = false;

@@ -5,6 +5,7 @@
 #include "AssetLoader.h"
 #include "../Renderer/Renderer.h"
 #include "../Primitives/Object.h"
+#include "../Primitives/Components/MeshComponent.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../include/stb_image.h"
@@ -14,7 +15,9 @@
 
 #include <iostream>
 
-std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath)
+#include "FileManager.h"
+
+std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath, ETextureType textureType)
 {
 	//If the texture is already loaded in the map then return it here
 	auto loadedTex = LoadedTextures.find(texturePath);
@@ -23,6 +26,7 @@ std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath)
 		return loadedTex->second;
 	}
 
+	FileManager::WriteStringToLog("Loading texture: " + texturePath);
 
 	int texWidth, texHeight, texChannels;
 	stbi_uc* pixels = stbi_load(texturePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
@@ -38,16 +42,31 @@ std::shared_ptr<Texture> AssetManager::LoadTexture(std::string texturePath)
 	memcpy(stagingBuffer.info.pMappedData, pixels, imageSize);
 	stbi_image_free(pixels);
 
-	Texture tex = Renderer::Get().CreateImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+	VkFormat imageFormat;
+	switch (textureType) {
+		case ETextureType::WorldTexture:
+			imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+			break;
+		case ETextureType::UITexture:
+			imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+			break;
+		default:
+			imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+	}
 
-	Renderer::Get().TransitionImageLayout(tex.GetAllocation().TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	//TODO: Refactor this so we are not creating unnecessary objects
+	Texture tex = Renderer::Get().CreateImage(texWidth, texHeight, imageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+	Renderer::Get().TransitionImageLayout(tex.GetAllocation().TextureImage, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	Renderer::Get().CopyBufferToImage(stagingBuffer.buffer, tex.GetAllocation().TextureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-	Renderer::Get().TransitionImageLayout(tex.GetAllocation().TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	Renderer::Get().TransitionImageLayout(tex.GetAllocation().TextureImage, imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	Renderer::Get().DestroyBuffer(stagingBuffer);
 
 	tex.SetName(GetNameFromPath(texturePath));
-	return std::make_shared<Texture>(tex);
+	std::shared_ptr<Texture> sharedTex = std::make_shared<Texture>(tex);
+	LoadedTextures.emplace(texturePath, sharedTex);
+	return sharedTex;
 
 }
 
@@ -61,6 +80,8 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 		return loadedMesh->second;
 	}
 
+	FileManager::WriteStringToLog("Loading model: " + modelPath);
+
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 
@@ -70,7 +91,7 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 	std::string err;
 
 	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err,modelPath.c_str(), 0, true)) {
-		std::cout << "Could not load model";
+		std::cout << "Could not load model" << modelPath << std::endl;
 		throw std::runtime_error(err);
 	}
 
@@ -115,20 +136,18 @@ std::shared_ptr<Mesh> AssetManager::LoadMesh(std::string modelPath)
 	std::cout << indices.size() << std::endl;
 
 	//Upload mesh to GPU
-	Mesh mesh(Renderer::Get().UploadModel(vertices, indices), GetNameFromPath(modelPath));
-	mesh.primitives.push_back(MeshPrimitives{ .startIndex = 0, .count = static_cast<uint32_t>(indices.size())});
-	return std::make_shared<Mesh>(mesh);
+	std::shared_ptr<Mesh> sharedMesh = std::make_shared<Mesh>(Renderer::Get().UploadModel(vertices, indices), GetNameFromPath(modelPath));
+	sharedMesh->primitives.push_back(MeshPrimitives{ .startIndex = 0, .count = static_cast<uint32_t>(indices.size())});
+	LoadedMeshes.emplace(modelPath, sharedMesh);
+	return sharedMesh;
 }
 
-void AssetManager::LoadObject(Object *obj) {
-	std::shared_ptr<Mesh> mesh = LoadMesh(obj->GetModelPath());
-	std::shared_ptr<Texture> texture = LoadTexture(obj->GetTexturePath());
+void AssetManager::LoadMeshComponent(MeshComponent *meshComp) {
+	std::shared_ptr<Mesh> mesh = LoadMesh(meshComp->GetModelPath());
+	std::shared_ptr<Texture> texture = LoadTexture(meshComp->GetTexturePath(), ETextureType::WorldTexture);
 
-	obj->GetMeshComponent()->SetMesh(mesh);
-	obj->GetMeshComponent()->SetTexture(texture);
-
-	LoadedMeshes.emplace(obj->GetModelPath(), mesh);
-	LoadedTextures.emplace(obj->GetTexturePath(), texture);
+	meshComp->SetMesh(mesh);
+	meshComp->SetTexture(texture);
 }
 
 std::string AssetManager::GetNameFromPath(std::string path) {

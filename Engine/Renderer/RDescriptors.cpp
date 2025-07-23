@@ -38,7 +38,7 @@ VkDescriptorSetLayout DescriptorLayoutBuilder::Build(VkDevice device, VkShaderSt
 
 
 
-void DescriptorAllocator::InitPool(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios) {
+void DescriptorAllocator::InitPool(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios, VkDescriptorPoolCreateFlags flags) {
     std::vector<VkDescriptorPoolSize> poolSizes;
 
     //Add pool types and how many descriptors can be in this pool. Ratio is # of individual descriptors PER descriptor set
@@ -50,12 +50,13 @@ void DescriptorAllocator::InitPool(VkDevice device, uint32_t maxSets, std::span<
     }
 
     VkDescriptorPoolCreateInfo pool_info = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    pool_info.flags = 0;
+    pool_info.flags = flags;
     pool_info.maxSets = maxSets; //Max # of descriptor sets that this pool can have
     pool_info.poolSizeCount = (uint32_t)poolSizes.size();
     pool_info.pPoolSizes = poolSizes.data();
 
-    vkCreateDescriptorPool(device, &pool_info, nullptr, &pool);
+    VkResult res = vkCreateDescriptorPool(device, &pool_info, nullptr, &pool);
+    assert(res == VK_SUCCESS);
 }
 
 void DescriptorAllocator::ClearDescriptors(VkDevice device) {

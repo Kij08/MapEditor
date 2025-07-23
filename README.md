@@ -1,24 +1,12 @@
-# Custom Game Engine
+# Tunnel Vision Map Editor
 
-Custom map creator/Game engine for my multiplayer shooter. As development has progressed this map editor
-has turned into more of a custom game engine.
+Custom map creator for my multiplayer shooter which does not yet exist.
 
-# Development phases:
-- Modernise old Vulkan rendering code 🟢
-  - Update descriptor set code
-  - Implement VMA
-- Asset and object management 🟢
-  - Texture and Mesh loading
-  - Vulkan buffer updates
-- Functioning draw loop 🟢
-- Implement ImGUI 🟢
-  - Adding buttons for creating new objects
-  - Fields for editing an objects mesh/texture/material
-  - etc.. 
-- Implement map creation/Game engine features <- Currently here
-  - Input handling
-  - Placing, deleting, and editing objects
--  Implement map loading and saving
+# Next steps
+- Map saving
+- File explorer window
+- Selection gizmo
+
 
 # Included Libraries
 - stb_image
@@ -36,3 +24,5 @@ Shoutout to these sites for providing tutorials, explanations, and code:
 - https://vulkan-tutorial.com/
 - https://vkguide.dev/
 - https://lesleylai.info/en/vk-khr-dynamic-rendering/
+
+UI Icons provided by https://game-icons.net

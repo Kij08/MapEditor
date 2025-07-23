@@ -3,3 +3,8 @@
 //
 
 #include "Mesh.h"
+#include "../Utils/FileManager.h"
+
+Mesh::~Mesh() {
+    FileManager::WriteStringToLog("Destroying mesh: " + MeshName);
+}

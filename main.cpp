@@ -13,7 +13,6 @@ void mainLoop() {
 
     //Init empty scene
     Scene* s = new Scene();
-    s->InitScene();
 
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
@@ -28,9 +27,9 @@ void mainLoop() {
         glfwPollEvents(); //Poll input callbacks
         s->Tick(deltaTime); //Tick level and all objects in it
 
-        ImDrawData* guiDrawData = r.RenderImGUIElements(s); //Get data for UI elements
+        ImDrawData* guiDrawData = EngineUI::RenderImGuiElements(s); //Get data for UI elements
         r.DrawFrame(s->GetObjectList(), guiDrawData, s->GetCameraForwardDirection(), s->GetCameraPosition()); //Draw objects and UI
-        //TODO: Pass just pointer to camera maybe?
+        //TODO: Pass just pointer to main camera maybe?
     }
 
     vkDeviceWaitIdle(r.GetDevice());
@@ -38,6 +37,9 @@ void mainLoop() {
 }
 
 int main() {
-
+    FileManager::OpenLogFile();
+    FileManager::WriteStringToLog("Begin Editor");
     mainLoop();
+    FileManager::WriteStringToLog("End Editor");
+    FileManager::CloseLogFile();
 }
