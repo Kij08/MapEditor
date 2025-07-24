@@ -52,5 +52,12 @@ void Object::Begin() {
 
 ObjectDefinition Object::GetObjectDefinition() {
     ObjectDefinition def { .objectName = ObjectDisplayName, .className = "Object", .transform = objTransform };
+    MeshComponentDefinition* meshDef = new MeshComponentDefinition();
+    meshDef->componentName = "MeshComp";
+    meshDef->className = "MeshComponent";
+    meshDef->componentTransform = meshComponent->GetComponentTransform();
+    meshDef->meshPath = meshComponent->GetModelPath();
+    meshDef->texturePath = meshComponent->GetTexturePath();
+    def.ComponentDefinitions.push_back(meshDef);
     return def;
 }

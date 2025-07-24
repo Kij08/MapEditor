@@ -251,20 +251,66 @@ namespace EngineUI {
 
     inline void FileExplorer(Scene* s) {
         ImGui::Begin("File Explorer");
-
-        for (auto& file : FileManager::DirectoryFiles) {
-            if (file.extension() == ".obj") {
-                ImGui::Image(meshIcon.DS, ImVec2(100, 100));
-            }
-            else if (file.extension() == ".png") {
-                ImGui::Image(imageIcon.DS, ImVec2(100, 100));
-            }
-            else {
-                ImGui::Image(folderIcon.DS, ImVec2(100, 100));
-            }
-            ImGui::SameLine();
+        if (ImGui::GetIO().MouseClicked[3]) {
+            FileManager::SetNewCurrentDirectory(FileManager::currentWorkingDirectory.parent_path());
         }
 
+        ImGuiStyle& style = ImGui::GetStyle();
+        int fileCount = FileManager::DirectoryFiles.size();
+        float window_visible_x2 = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+        for (int n = 0; n < fileCount; n++) {
+            auto& file = FileManager::DirectoryFiles[n];
+
+            ImGui::PushID(n);
+            static bool selected = false;
+            if (file.extension() == ".obj") {
+                ImGui::BeginGroup();
+                ImGui::BeginGroup();
+                ImGui::SetNextItemAllowOverlap();
+                ImGui::Selectable("##FileSelect", &selected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(110, 110));
+                if (ImGui::IsMouseDoubleClicked(0))
+                    selected = !selected;
+                ImGui::Image(meshIcon.DS, ImVec2(100, 100));
+                ImGui::Text(file.filename().c_str());
+                ImGui::EndGroup();
+                ImGui::EndGroup();
+            }
+            else if (file.extension() == ".png") {
+                ImGui::BeginGroup();
+                ImGui::BeginGroup();
+                ImGui::SetNextItemAllowOverlap();
+                ImGui::Selectable("##FileSelect", &selected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(110, 110));
+                if (ImGui::IsMouseDoubleClicked(0))
+                    selected = !selected;
+                ImGui::Image(imageIcon.DS, ImVec2(100, 100));
+                ImGui::Text(file.filename().c_str());
+                ImGui::EndGroup();
+                ImGui::EndGroup();
+            }
+            else {
+                ImGui::BeginGroup();
+                ImGui::BeginGroup();
+                ImGui::Selectable("##FileSelect", &selected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(110, 110));
+                if (ImGui::IsMouseDoubleClicked(0))
+                    selected = !selected;
+                ImGui::Image(folderIcon.DS, ImVec2(100, 100));
+                ImGui::Text(file.string().substr(file.string().find_last_of('/')+1).c_str());
+                ImGui::EndGroup();
+                ImGui::EndGroup();
+
+                if (selected) {
+                    FileManager::SetNewCurrentDirectory(file);
+                    selected = false;
+                    ImGui::PopID();
+                    break;
+                }
+            }
+            float last_icon_x2 = ImGui::GetItemRectMax().x;
+            float next_icon_x2 = last_icon_x2 + style.ItemSpacing.x + 100; // Expected position if next button was on same line
+            if (n + 1 < fileCount && next_icon_x2 < window_visible_x2)
+                ImGui::SameLine();
+            ImGui::PopID();
+        }
 
         ImGui::End();
     }
@@ -283,7 +329,7 @@ namespace EngineUI {
         ImGui_ImplGlfw_NewFrame();
 
         ImGui::NewFrame();
-        //ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow();
 
         //Create dockspace
         ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_PassthruCentralNode;

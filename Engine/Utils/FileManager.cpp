@@ -4,17 +4,12 @@
 
 #include "FileManager.h"
 
-//Path to the dir that contains the map file
-inline std::filesystem::path currentMapDirectory;
-//Path to the dir that the user has selected in the file viewer
-inline std::filesystem::path currentWorkingDirectory;
-inline std::ofstream logFile;
-
 //Helper functions
-void WriteObjectDefinitionToFile(std::ifstream& mapFile, ObjectDefinition& objectDefinition);
+void WriteObjectDefinitionToFile(std::ofstream& mapFile, const ObjectDefinition &objectDefinition);
 bool CreateSceneFromFile(std::ifstream& mapFile, Scene*& s);
 std::istream& GetNextLineInFile(std::ifstream& file, std::string& line);
 std::filesystem::path OpenChooseFileDialog();
+void UpdateFilesInCurrentDirectory();
 
 //Component definitions
 void GetComponentDefinition(const std::string& line, ObjectDefinition& definition);
@@ -43,7 +38,7 @@ std::filesystem::path OpenChooseFileDialog() {
 #endif
 
     openedFile = std::filesystem::path(path);
-    currentMapDirectory = openedFile.parent_path();
+    FileManager::currentMapDirectory = openedFile.parent_path();
     return openedFile;
 }
 
@@ -106,6 +101,8 @@ void GetComponentDefinition(const std::string& line, ObjectDefinition& definitio
     std::string lineSubString = line.substr(line.find_first_of(' ') + 1);
     std::string compClass = lineSubString.substr(0, lineSubString.find_first_of(' '));
     std::string definitionStart = lineSubString.substr(lineSubString.find_first_of(' ') + 1);
+
+    //Component definitions deleted in scene constructor
     if (compClass == FileManager::MeshComponent) {
         MeshComponentDefinition* mc = GetMeshCompDefinition(definitionStart);
         definition.ComponentDefinitions.push_back(mc);
@@ -210,9 +207,9 @@ bool FileManager::OpenMapFile(Scene*& s) {
     WriteStringToLog("Opening Map File...");
     //filesystem should be cross-platform so once we have the filepath we can work with it on both OSs
     std::filesystem::path mapToLoad = OpenChooseFileDialog();
+    currentMapFile = mapToLoad;
     currentMapDirectory = mapToLoad.parent_path();
-    currentWorkingDirectory = currentMapDirectory;
-    SetNewCurrentDirectory(currentWorkingDirectory.append("Map Content/"));
+    SetNewCurrentDirectory(currentMapDirectory.append("Map Content"));
 
     std::ifstream mapFile(mapToLoad);
     if (mapFile.fail()) {
@@ -225,14 +222,23 @@ bool FileManager::OpenMapFile(Scene*& s) {
 }
 
 void FileManager::SaveCurrentMap(Scene* s) {
+    std::ofstream mapFile(currentMapFile);
     for (auto& obj : s->GetObjectList()) {
-
+        WriteObjectDefinitionToFile(mapFile, obj->GetObjectDefinition());
     }
 }
 
 void FileManager::SaveCurrentMapAs(Scene* s) {
 
 }
+
+void WriteObjectDefinitionToFile(std::ofstream& mapFile, const ObjectDefinition& objectDefinition) {
+
+
+
+    //Delete object component definitions
+}
+
 
 bool FileManager::ValidateFilePath(const std::string& path) {
     return std::filesystem::exists(path);
@@ -246,16 +252,16 @@ bool FileManager::CreateNewMap(const std::string& newMapPath, const std::string&
     std::filesystem::create_directory(mapPath);
     currentMapDirectory = mapPath;
 
-
+    currentMapFile = mapPath.string() + '/' + newMapName + ".tmap";
     //In the created directory make a map file named "map name" and a "Map Content" directory
-    std::ofstream mapFile( mapPath.string() + '/' + newMapName + ".tmap");
+    std::ofstream mapFile( currentMapFile);
     mapFile << EndMarker << std::endl; //Write end marker to denote empty scene
     std::filesystem::create_directory(mapPath.string() + "Map Content");
     std::filesystem::create_directory(mapPath.string() + "Logs");
-    SetNewCurrentDirectory(mapPath.string() + ("Map Content/"));
+    SetNewCurrentDirectory(mapPath.string() + "Map Content");
     mapFile.close();
 
-    std::ifstream readMapFile(mapPath.string() + '/' + newMapName + ".tmap");
+    std::ifstream readMapFile(currentMapFile);
 
     return CreateSceneFromFile(readMapFile, s);
 }
@@ -263,16 +269,36 @@ bool FileManager::CreateNewMap(const std::string& newMapPath, const std::string&
 //Updates DirectoryFiles to the new current directory. Don't call every frame
 void UpdateFilesInCurrentDirectory() {
     FileManager::DirectoryFiles.clear();
-    for (const auto& file : std::filesystem::directory_iterator{currentWorkingDirectory}) {
-        FileManager::DirectoryFiles.push_back(file.path());
+
+    std::vector<std::filesystem::path> Folders;
+    std::vector<std::filesystem::path> Files;
+    for (const auto& file : std::filesystem::directory_iterator{FileManager::currentWorkingDirectory}) {
+        if (file.path().has_extension()) {
+            Files.push_back(file.path());
+        }
+        else {
+            Folders.push_back(file.path());
+        }
     }
+
+    //Store the folders first, then the files.
+
+    //TODO: Improve sorting algorithm
+    std::sort(Folders.begin(), Folders.end());
+    for (auto& directoryFile : Folders) {
+        FileManager::DirectoryFiles.push_back(directoryFile);
+    }
+    std::sort(Files.begin(), Files.end());
+    for (auto& directoryFile : Files) {
+        FileManager::DirectoryFiles.push_back(directoryFile);
+    }
+    FileManager::WriteStringToLog("Directory files read: " + std::to_string(FileManager::DirectoryFiles.size()));
 }
 
-void FileManager::SetNewCurrentDirectory(std::filesystem::path newDir) {
+void FileManager::SetNewCurrentDirectory(const std::filesystem::path& newDir) {
     if (ValidateFilePath(newDir)) {
-        currentWorkingDirectory = newDir;
-        WriteStringToLog("New working directory: " + newDir.string());
-        //UpdateFilesInCurrentDirectory(); TODO: Fix updating dir files
+        currentWorkingDirectory.assign(newDir);
+        UpdateFilesInCurrentDirectory();
     }
     else {
         WriteStringToLog("Set working dir to invalid path");

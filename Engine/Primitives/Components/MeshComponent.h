@@ -12,6 +12,7 @@
 
 class MeshComponent : public Component{
 public:
+    MeshComponent() = delete;
     MeshComponent(class Empty* o, std::string modelPath, std::string texPath);
     void RenderComponentImGui(Scene* s) override;
 

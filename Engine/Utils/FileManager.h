@@ -40,6 +40,7 @@ namespace FileManager {
 
     //Path to the dir that contains the map file
     inline std::filesystem::path currentMapDirectory;
+    inline std::filesystem::path currentMapFile;
     //Path to the dir that the user has selected in the file viewer
     inline std::filesystem::path currentWorkingDirectory;
     inline std::ofstream logFile;
@@ -72,7 +73,7 @@ namespace FileManager {
     //Stores the files that are in the users current working directory
     inline std::vector<std::filesystem::path> DirectoryFiles;
 
-    void SetNewCurrentDirectory(std::filesystem::path newDir);
+    void SetNewCurrentDirectory(const std::filesystem::path& newDir);
 };
 
 
