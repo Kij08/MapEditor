@@ -7,7 +7,7 @@
 #include "../Utils/FileManager.h"
 
 Scene::Scene() : sceneViewer(this) {
-    FileManager::WriteStringToLog("Load Scene");
+    FileManager::WriteStringToLog("Load empty scene");
     InitScene();
 }
 

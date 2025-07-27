@@ -34,8 +34,8 @@ namespace FileManager {
     constexpr std::string ObjectClass = "Object";
 
     //List of components for same reason as above
-    constexpr std::string MeshComponent = "Mesh";
-    constexpr std::string CameraComponent = "Camera";
+    constexpr std::string MeshComponent = "MeshComponent";
+    constexpr std::string CameraComponent = "CameraComponent";
 
 
     //Path to the dir that contains the map file

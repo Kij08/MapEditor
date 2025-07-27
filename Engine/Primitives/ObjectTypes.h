@@ -17,18 +17,36 @@ struct Transform {
 
     //Transforms a comma seperated transform string into a Transform type
     static Transform StringToTransform(std::string s) {
-        int transformValues[9];
+        float transformValues[9];
         for (int i = 0; i < 9; i++) {
             size_t bitEndPos = s.find_first_of(',');
             std::string transformBit = s.substr(0, bitEndPos);
             s = s.substr(bitEndPos + 1);
 
-            transformValues[i] = std::stoi(transformBit);
+            transformValues[i] = std::stof(transformBit);
         }
         return {.position = {transformValues[0], transformValues[1], transformValues[2]},
         .rotation = {transformValues[3], transformValues[4], transformValues[5]},
         .scale = {transformValues[6], transformValues[7], transformValues[8]}};
     }
+
+    //Transforms a transform into a comma seperated string
+    static std::string TransformToString(Transform t) {
+        std::string st;
+
+        st.append(std::to_string(t.position.x) + ",");
+        st.append(std::to_string(t.position.y) + ",");
+        st.append(std::to_string(t.position.z) + ",");
+        st.append(std::to_string(t.rotation.x) + ",");
+        st.append(std::to_string(t.rotation.y) + ",");
+        st.append(std::to_string(t.rotation.z) + ",");
+        st.append(std::to_string(t.scale.x) + ",");
+        st.append(std::to_string(t.scale.y) + ",");
+        st.append(std::to_string(t.scale.z));
+
+        return st;
+    }
+
 };
 
 //Definitions for reading objects and components from files

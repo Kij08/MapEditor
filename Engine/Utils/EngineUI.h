@@ -144,7 +144,7 @@ namespace EngineUI {
                     bIsMapLoaded = FileManager::OpenMapFile(s);
                     CreateMapModal(bIsMapLoaded, s);
                 }
-                if (ImGui::MenuItem("Save", "Ctrl+S"))   { /* Do stuff */ }
+                if (ImGui::MenuItem("Save", "Ctrl+S"))   { FileManager::SaveCurrentMap(s); }
                 if (ImGui::MenuItem("Close", "Ctrl+W"))  {  }
                 ImGui::EndMenu();
             }
@@ -270,7 +270,12 @@ namespace EngineUI {
                 ImGui::Selectable("##FileSelect", &selected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(110, 110));
                 if (ImGui::IsMouseDoubleClicked(0))
                     selected = !selected;
-                ImGui::Image(meshIcon.DS, ImVec2(100, 100));
+
+                ImVec2 selectableMin = ImGui::GetItemRectMin();
+                ImVec2 selectableMax = ImGui::GetItemRectMax();
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                drawList->AddImage(meshIcon.DS, selectableMin, selectableMax, ImVec2(0,0), ImVec2(1,1));
+                //ImGui::Image(meshIcon.DS, ImVec2(100, 100));
                 ImGui::Text(file.filename().c_str());
                 ImGui::EndGroup();
                 ImGui::EndGroup();
@@ -282,7 +287,11 @@ namespace EngineUI {
                 ImGui::Selectable("##FileSelect", &selected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(110, 110));
                 if (ImGui::IsMouseDoubleClicked(0))
                     selected = !selected;
-                ImGui::Image(imageIcon.DS, ImVec2(100, 100));
+                ImVec2 selectableMin = ImGui::GetItemRectMin();
+                ImVec2 selectableMax = ImGui::GetItemRectMax();
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                drawList->AddImage(imageIcon.DS, selectableMin, selectableMax, ImVec2(0,0), ImVec2(1,1));
+                //ImGui::Image(imageIcon.DS, ImVec2(100, 100));
                 ImGui::Text(file.filename().c_str());
                 ImGui::EndGroup();
                 ImGui::EndGroup();
@@ -293,7 +302,11 @@ namespace EngineUI {
                 ImGui::Selectable("##FileSelect", &selected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(110, 110));
                 if (ImGui::IsMouseDoubleClicked(0))
                     selected = !selected;
-                ImGui::Image(folderIcon.DS, ImVec2(100, 100));
+                ImVec2 selectableMin = ImGui::GetItemRectMin();
+                ImVec2 selectableMax = ImGui::GetItemRectMax();
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                drawList->AddImage(folderIcon.DS, selectableMin, selectableMax, ImVec2(0,0), ImVec2(1,1));
+                //ImGui::Image(folderIcon.DS, ImVec2(100, 100));
                 ImGui::Text(file.string().substr(file.string().find_last_of('/')+1).c_str());
                 ImGui::EndGroup();
                 ImGui::EndGroup();

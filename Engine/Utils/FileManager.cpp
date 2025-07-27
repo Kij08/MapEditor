@@ -234,9 +234,22 @@ void FileManager::SaveCurrentMapAs(Scene* s) {
 
 void WriteObjectDefinitionToFile(std::ofstream& mapFile, const ObjectDefinition& objectDefinition) {
 
+    mapFile << FileManager::ObjectMarker << " " << objectDefinition.objectName << std::endl;
+    mapFile << FileManager::ClassMarker << " " << objectDefinition.className << std::endl;
+    mapFile << FileManager::TransformMarker << " " << Transform::TransformToString(objectDefinition.transform) << std::endl;
 
+    for (auto compDef : objectDefinition.ComponentDefinitions) {
+        if (auto meshDef = dynamic_cast<MeshComponentDefinition*>(compDef)) {
+            mapFile << FileManager::ComponentMarker << " ";
+            mapFile << compDef->className << " " << Transform::TransformToString(compDef->componentTransform) << " "
+            << meshDef->meshPath << " " << meshDef->texturePath << " " << meshDef->materialName << std::endl;
+        }
 
-    //Delete object component definitions
+        //Delete dynamically created object component definition
+        delete compDef;
+    }
+
+    mapFile << FileManager::EndMarker << std::endl;
 }
 
 
@@ -256,9 +269,9 @@ bool FileManager::CreateNewMap(const std::string& newMapPath, const std::string&
     //In the created directory make a map file named "map name" and a "Map Content" directory
     std::ofstream mapFile( currentMapFile);
     mapFile << EndMarker << std::endl; //Write end marker to denote empty scene
-    std::filesystem::create_directory(mapPath.string() + "Map Content");
-    std::filesystem::create_directory(mapPath.string() + "Logs");
-    SetNewCurrentDirectory(mapPath.string() + "Map Content");
+    std::filesystem::create_directory(mapPath.string() + "/Map Content");
+    std::filesystem::create_directory(mapPath.string() + "/Logs");
+    SetNewCurrentDirectory(mapPath.string() + "/Map Content");
     mapFile.close();
 
     std::ifstream readMapFile(currentMapFile);
